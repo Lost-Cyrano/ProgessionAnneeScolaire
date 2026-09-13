@@ -382,7 +382,6 @@
             letter-spacing: 0.05rem;
         }
 
-        /* Message de chargement / erreur */
         .loading-message {
             text-align: center;
             padding: 2.4rem;
@@ -652,14 +651,20 @@
                     positioned.push({ ...item, pos, row });
                 });
 
-                const ROW_BASE_HEIGHT_REM = minRowHeight || 4.5;
-                const ROW_GAP_REM = 0.8;
-                const FIRST_ROW_OFFSET_REM = 0.4;
+                // --- ESPACEMENT VERTICAL AUGMENTÉ ---
+                // Chaque ligne de légende a une hauteur minimale plus grande
+                // et un écart vertical (gap) plus important entre les lignes
+                // pour garantir un espacement visuel confortable.
+                const ROW_BASE_HEIGHT_REM = minRowHeight || 5.5;
+                const ROW_GAP_REM = 1.6;   // écart vertical augmenté (avant : 0.8rem)
+                const FIRST_ROW_OFFSET_REM = 1.2; // espace sous la barre (avant : 0.4rem)
 
+                // Calcul de la hauteur réellement nécessaire pour chaque ligne
+                // en fonction du contenu (chaque pastille fait ~4.5rem de haut)
                 const rowHeights = [];
                 positioned.forEach(item => {
                     if (!rowHeights[item.row]) rowHeights[item.row] = 0;
-                    rowHeights[item.row] = Math.max(rowHeights[item.row], 3.5);
+                    rowHeights[item.row] = Math.max(rowHeights[item.row], 4.5);
                 });
 
                 const rowTops = [];
@@ -669,7 +674,7 @@
                     cumulativeTop += (rowHeights[r] || ROW_BASE_HEIGHT_REM) + ROW_GAP_REM;
                 }
 
-                const totalLegendsHeight = cumulativeTop + 0.5;
+                const totalLegendsHeight = cumulativeTop + 1.5; // marge en bas
                 legendsEl.style.minHeight = totalLegendsHeight + 'rem';
 
                 positioned.forEach(item => {
@@ -680,7 +685,7 @@
                     legend.className = 'legend-item';
                     legend.dataset.evtId = item.id;
                     legend.style.left = item.pos + '%';
-                    legend.style.height = (targetTop + 4) + 'rem';
+                    legend.style.height = (targetTop + 5) + 'rem';
                     legend.style.width = '0';
                     legend.style.top = '0';
 
@@ -833,7 +838,7 @@
                     legendsEl: document.getElementById('annexLegends'),
                     totalStart: period.start,
                     totalEnd: period.end,
-                    minRowHeight: 4,
+                    minRowHeight: 5,
                     showPeriodSegments: false,
                     isCumul: false
                 });
@@ -868,7 +873,7 @@
                     legendsEl: document.getElementById('annexLegends'),
                     totalStart: startDate,
                     totalEnd: evt.date,
-                    minRowHeight: 4,
+                    minRowHeight: 5,
                     showPeriodSegments: false,
                     isCumul: false
                 });
@@ -935,7 +940,7 @@
                     legendsEl: legendsEl,
                     totalStart: startDate,
                     totalEnd: endDate,
-                    minRowHeight: 4,
+                    minRowHeight: 5,
                     showPeriodSegments: true,
                     isCumul: true
                 });
@@ -1112,12 +1117,10 @@
                     }
                     config = await response.json();
 
-                    // Validation minimale de la structure
                     if (!config.startDate || !config.endDate) {
                         throw new Error('Le fichier events.json doit contenir "startDate" et "endDate".');
                     }
 
-                    // Conversion des dates
                     startDate = new Date(config.startDate);
                     endDate = new Date(config.endDate);
 
@@ -1129,7 +1132,6 @@
                         throw new Error('La date de début doit être antérieure à la date de fin.');
                     }
 
-                    // Conversion des événements instantanés
                     instantEvents = (config.instantEvents || []).map(evt => ({
                         id: evt.id,
                         label: evt.label,
@@ -1137,7 +1139,6 @@
                         color: evt.color || '#643c00'
                     })).filter(evt => !isNaN(evt.date.getTime()));
 
-                    // Conversion des périodes
                     periodEvents = (config.periodEvents || []).map(p => ({
                         id: p.id,
                         label: p.label,
@@ -1146,17 +1147,14 @@
                         color: p.color || '#008673'
                     })).filter(p => !isNaN(p.start.getTime()) && !isNaN(p.end.getTime()));
 
-                    // Titre personnalisé
                     if (config.title) {
                         document.getElementById('mainTitle').textContent = config.title;
                     }
 
-                    // Cacher le message de chargement, afficher le contenu
                     loadingMessage.style.display = 'none';
                     document.getElementById('mainSection').style.display = '';
                     document.getElementById('annexBlock').style.display = '';
 
-                    // Initialisation
                     buildAnnexOptions();
                     initSelector();
                     buildMainBar();
