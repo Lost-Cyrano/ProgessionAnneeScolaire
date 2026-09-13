@@ -1,0 +1,19 @@
+{
+    "title": "Progression de l'année scolaire 2026 - 2027",
+    "startDate": "2026-09-01T08:00:00",
+    "endDate": "2027-07-02T18:00:00",
+    "instantEvents": [
+        { "id": "photos",    "label": "Photos de classe", "date": "2026-09-22T00:00:00", "color": "#643c00" },
+        { "id": "armistice", "label": "Armistice 1918",   "date": "2026-11-11T00:00:00", "color": "#643c00" },
+        { "id": "passage",   "label": "Passage 2027",     "date": "2027-01-01T00:00:00", "color": "#643c00" }
+    ],
+    "periodEvents": [
+        { "id": "toussaint", "label": "Toussaint", "start": "2026-10-18T00:00:00", "end": "2026-11-02T00:00:00", "color": "#aa6600" },
+        { "id": "noel",      "label": "Noël",      "start": "2026-12-20T00:00:00", "end": "2027-01-04T00:00:00", "color": "#0e78d5" },
+        { "id": "hiver",     "label": "Hiver",     "start": "2027-02-21T00:00:00", "end": "2027-03-08T00:00:00", "color": "#008673" },
+        { "id": "paques",    "label": "Pâques",    "start": "2027-03-28T00:00:00", "end": "2027-03-30T00:00:00", "color": "#935ec7" },
+        { "id": "printemps", "label": "Printemps", "start": "2027-04-18T00:00:00", "end": "2027-05-03T00:00:00", "color": "#11acb1" },
+        { "id": "ascension", "label": "Ascension", "start": "2027-05-06T00:00:00", "end": "2027-05-10T00:00:00", "color": "#b9335f" },
+        { "id": "pentecote", "label": "Pentecôte", "start": "2027-05-16T00:00:00", "end": "2027-05-18T00:00:00", "color": "#df2121" }
+    ]
+}
