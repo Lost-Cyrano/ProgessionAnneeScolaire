@@ -1,1 +1,1193 @@
-Booh
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Progression de l'année scolaire</title>
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            min-height: 100%;
+            font-family: "Montserrat", Arial, Verdana, Geneva, Helvetica, sans-serif;
+            font-size: 62.5%;
+            line-height: 1.2;
+            background-color: #ffffff;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            padding: 2.4rem 1.6rem;
+            font-size: 1.6rem;
+            color: #000000;
+        }
+
+        .progress-container {
+            width: 100%;
+            max-width: 100%;
+            padding: 2.4rem 2rem 3.2rem;
+            background-color: #ffffff;
+            border-radius: 0.7rem;
+            box-shadow: 0.05rem 0.05rem 0.2rem 0.2rem rgba(148, 148, 148, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 2.4rem;
+        }
+
+        .progress-title {
+            font-size: 2.1rem;
+            font-weight: 700;
+            color: #6b6e77;
+            text-align: center;
+            margin: 0;
+        }
+
+        .progress-permille {
+            font-size: 4.8rem;
+            font-weight: 800;
+            color: #00584c;
+            text-align: center;
+            margin: 0;
+            line-height: 1;
+            letter-spacing: -0.1rem;
+        }
+
+        .progress-permille span {
+            font-size: 2.4rem;
+            font-weight: 600;
+            color: #949494;
+        }
+
+        .progress-section {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+
+        .section-title {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #6b6e77;
+            margin: 0;
+            padding-left: 0.8rem;
+            border-left: 0.4rem solid #008673;
+        }
+
+        .progress-bar-zone {
+            position: relative;
+            width: 100%;
+        }
+
+        .progress-bar-wrapper {
+            width: 100%;
+            height: 3.2rem;
+            background-color: #e2e2e2;
+            border-radius: 0.4rem;
+            position: relative;
+            box-shadow: inset 0 0.2rem 0.4rem rgba(0, 0, 0, 0.1);
+            overflow: visible;
+            z-index: 3;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #00584c, #008673);
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            transition: width 0.5s ease-in-out;
+            opacity: 0.9;
+            border-radius: 0.4rem;
+        }
+
+        .annex-block .progress-bar-wrapper {
+            background-color: #ffffff;
+            border: 0.1rem solid #e2e2e2;
+            box-shadow: inset 0 0.1rem 0.2rem rgba(0, 0, 0, 0.05);
+        }
+
+        .annex-block .progress-bar-fill {
+            background: none;
+        }
+
+        .progress-period {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            z-index: 2;
+            opacity: 0.85;
+            transition: opacity 0.25s ease, filter 0.25s ease;
+            cursor: pointer;
+        }
+
+        .annex-block .progress-bar-wrapper:not(.cumul-wrapper) .progress-period {
+            display: none;
+        }
+
+        .cumul-wrapper .progress-period {
+            display: block;
+            opacity: 1;
+            border-right: 0.1rem solid rgba(255, 255, 255, 0.7);
+        }
+
+        .cumul-wrapper .progress-period:last-child {
+            border-right: none;
+        }
+
+        .event-marker {
+            position: absolute;
+            top: 0;
+            width: 0.2rem;
+            height: 100%;
+            transform: translateX(-50%);
+            z-index: 5;
+            cursor: pointer;
+            transition: opacity 0.25s ease, filter 0.25s ease;
+        }
+
+        .event-marker::after {
+            content: '';
+            position: absolute;
+            top: -0.4rem;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0.8rem;
+            height: 0.8rem;
+            background-color: inherit;
+            border-radius: 50%;
+            border: 0.15rem solid #ffffff;
+            box-shadow: 0 0.1rem 0.3rem rgba(0, 0, 0, 0.3);
+        }
+
+        .floating-label {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-0.6rem);
+            padding: 0.4rem 0.8rem;
+            border-radius: 0.4rem;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #ffffff;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            z-index: 20;
+            box-shadow: 0 0.3rem 0.6rem rgba(0, 0, 0, 0.25);
+            border: 0.15rem solid #ffffff;
+        }
+
+        .floating-label.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-0.4rem);
+        }
+
+        .floating-label::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 0.5rem solid transparent;
+            border-top-color: var(--floating-arrow-color, #000000);
+        }
+
+        .legends-container {
+            position: relative;
+            width: 100%;
+            margin-top: 0;
+        }
+
+        .legend-item {
+            position: absolute;
+            display: block;
+            pointer-events: auto;
+            transition: opacity 0.25s ease, filter 0.25s ease;
+        }
+
+        .legend-connector {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0.2rem;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .legend-badge {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #ffffff;
+            padding: 0.6rem 1rem;
+            border-radius: 0.5rem;
+            white-space: nowrap;
+            box-shadow: 0 0.2rem 0.4rem rgba(0, 0, 0, 0.2);
+            text-align: center;
+            line-height: 1.2;
+            border: 0.2rem solid rgba(255, 255, 255, 0.9);
+            z-index: 3;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .legend-badge .legend-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+
+        .legend-badge .legend-subtitle {
+            font-size: 1rem;
+            font-weight: 500;
+            opacity: 0.9;
+            font-style: italic;
+        }
+
+        .progress-bar-zone.has-hover .legend-item:not(.is-highlighted),
+        .progress-bar-zone.has-hover .progress-period:not(.is-highlighted),
+        .progress-bar-zone.has-hover .event-marker:not(.is-highlighted) {
+            opacity: 0.15;
+            filter: grayscale(0.8);
+        }
+
+        .legend-item.is-highlighted .legend-badge {
+            box-shadow: 0 0.4rem 1rem rgba(0, 0, 0, 0.4);
+            transform: translateX(-50%) scale(1.05);
+            z-index: 10;
+        }
+
+        .annex-block {
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+            padding: 1.6rem;
+            background-color: #f8f8f8;
+            border-radius: 0.7rem;
+            border: 0.1rem solid #e2e2e2;
+        }
+
+        .annex-selector-block {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+            padding: 1.2rem;
+            background-color: #ffffff;
+            border-radius: 0.5rem;
+            border: 0.1rem solid #e2e2e2;
+        }
+
+        .annex-search-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .annex-search-row label {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #6b6e77;
+            white-space: nowrap;
+        }
+
+        .annex-search-row input[type="text"] {
+            flex: 1 1 auto;
+            min-width: 0;
+            padding: 0.6rem 0.8rem;
+            font-size: 1.3rem;
+            font-family: inherit;
+            font-weight: 600;
+            color: #000000;
+            background-color: #f8f8f8;
+            border: 0.15rem solid #c5c5c5;
+            border-radius: 0.4rem;
+        }
+
+        .annex-search-row input[type="text"]:focus {
+            outline: none;
+            border-color: #00584c;
+            background-color: #ffffff;
+        }
+
+        .annex-select-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .annex-select-row label {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #6b6e77;
+            white-space: nowrap;
+        }
+
+        .annex-select-row select {
+            flex: 1 1 auto;
+            min-width: 0;
+            padding: 0.6rem 0.8rem;
+            font-size: 1.3rem;
+            font-family: inherit;
+            font-weight: 600;
+            color: #000000;
+            background-color: #ffffff;
+            border: 0.15rem solid #949494;
+            border-radius: 0.4rem;
+            cursor: pointer;
+        }
+
+        .annex-select-row select:focus {
+            outline: none;
+            border-color: #00584c;
+        }
+
+        .annex-summary {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #6b6e77;
+            font-style: italic;
+            text-align: center;
+            padding-top: 0.4rem;
+        }
+
+        .footer-credit {
+            width: 100%;
+            max-width: 100%;
+            margin-top: 2.4rem;
+            padding: 1.2rem;
+            text-align: center;
+            font-size: 1rem;
+            font-weight: 500;
+            color: #949494;
+            font-style: italic;
+            letter-spacing: 0.05rem;
+        }
+
+        /* Message de chargement / erreur */
+        .loading-message {
+            text-align: center;
+            padding: 2.4rem;
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #6b6e77;
+        }
+
+        .loading-message.error {
+            color: #df2121;
+        }
+
+        @media (max-width: 900px) {
+            .progress-container { padding: 1.6rem 1rem 2.4rem; }
+            .progress-title { font-size: 1.7rem; }
+            .progress-permille { font-size: 3.6rem; }
+            .progress-permille span { font-size: 1.8rem; }
+            .progress-bar-wrapper { height: 2.8rem; }
+            .legend-badge { font-size: 1.2rem; padding: 0.5rem 0.8rem; }
+            .legend-badge .legend-title { font-size: 1.2rem; }
+            .legend-badge .legend-subtitle { font-size: 0.9rem; }
+            .floating-label { font-size: 1.1rem; }
+            .section-title { font-size: 1.4rem; }
+        }
+
+        @media (max-width: 600px) {
+            .progress-container { padding: 1.2rem 0.8rem 2rem; gap: 1.6rem; }
+            .progress-title { font-size: 1.3rem; }
+            .progress-permille { font-size: 2.6rem; }
+            .progress-permille span { font-size: 1.3rem; }
+            .progress-bar-wrapper { height: 2.2rem; }
+            .legend-badge { font-size: 1rem; padding: 0.4rem 0.6rem; }
+            .legend-badge .legend-title { font-size: 1rem; }
+            .legend-badge .legend-subtitle { font-size: 0.8rem; }
+            .floating-label { font-size: 0.9rem; padding: 0.3rem 0.5rem; }
+            .section-title { font-size: 1.2rem; }
+            .annex-search-row label,
+            .annex-select-row label { font-size: 1.1rem; }
+            .annex-search-row input[type="text"],
+            .annex-select-row select { font-size: 1.1rem; padding: 0.5rem 0.6rem; }
+            .footer-credit { font-size: 0.9rem; }
+        }
+
+        @media (max-width: 400px) {
+            .progress-title { font-size: 1.2rem; }
+            .progress-permille { font-size: 2.2rem; }
+            .legend-badge { font-size: 0.9rem; padding: 0.3rem 0.5rem; }
+            .legend-badge .legend-title { font-size: 0.9rem; }
+            .legend-badge .legend-subtitle { font-size: 0.7rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="progress-container">
+        <h1 class="progress-title" id="mainTitle">Progression de l'année scolaire</h1>
+
+        <!-- Barre principale -->
+        <div class="progress-section" id="mainSection" style="display: none;">
+            <p class="progress-permille" id="progressPermille">0 <span>‱</span></p>
+            <div class="progress-bar-zone" id="mainZone">
+                <div class="progress-bar-wrapper" id="mainWrapper">
+                    <div class="progress-bar-fill" id="mainFill"></div>
+                </div>
+                <div class="legends-container" id="mainLegends"></div>
+            </div>
+        </div>
+
+        <!-- Bloc annexe -->
+        <div class="annex-block" id="annexBlock" style="display: none;">
+            <div class="annex-selector-block">
+                <div class="annex-search-row">
+                    <label for="annexSearch">🔍 Rechercher :</label>
+                    <input type="text" id="annexSearch" placeholder="Tapez pour filtrer...">
+                </div>
+                <div class="annex-select-row">
+                    <label for="annexSelector">Barre affichée :</label>
+                    <select id="annexSelector"></select>
+                </div>
+            </div>
+
+            <div class="progress-section" id="annexSection">
+                <div class="progress-bar-zone" id="annexZone">
+                    <div class="progress-bar-wrapper" id="annexWrapper">
+                        <div class="progress-bar-fill" id="annexFill"></div>
+                    </div>
+                    <div class="legends-container" id="annexLegends"></div>
+                </div>
+                <div class="annex-summary" id="annexSummary"></div>
+            </div>
+        </div>
+
+        <!-- Message de chargement / erreur -->
+        <div class="loading-message" id="loadingMessage">Chargement des événements...</div>
+    </div>
+
+    <!-- Pied de page -->
+    <footer class="footer-credit">
+        Création de MAIRE Anaël, 2026, tous droits réservés
+    </footer>
+
+    <script>
+        (function() {
+            // --- VARIABLES GLOBALES ---
+            let startDate = null;
+            let endDate = null;
+            let instantEvents = [];
+            let periodEvents = [];
+            let annexOptions = [];
+            let currentAnnexId = 'cumul';
+            let config = null;
+
+            // --- UTILITAIRES ---
+            function getCurrentDate() {
+                return new Date();
+            }
+
+            function getProgress(date, start, end) {
+                const total = end - start;
+                if (total <= 0) return 0;
+                const elapsed = date - start;
+                if (elapsed <= 0) return 0;
+                if (elapsed >= total) return 1;
+                return elapsed / total;
+            }
+
+            function daysBetween(date1, date2) {
+                const oneDay = 24 * 60 * 60 * 1000;
+                return Math.round((date2 - date1) / oneDay);
+            }
+
+            function getRelativeText(eventDate, refDate) {
+                const today = new Date(refDate);
+                today.setHours(0, 0, 0, 0);
+                const evtDay = new Date(eventDate);
+                evtDay.setHours(0, 0, 0, 0);
+                const diff = daysBetween(today, evtDay);
+
+                if (diff === 0) return "Aujourd'hui";
+                if (diff === 1) return "Demain";
+                if (diff === -1) return "Hier";
+                if (diff > 1) return "Dans " + diff + " jours";
+                return "Il y a " + Math.abs(diff) + " jours";
+            }
+
+            function normalize(str) {
+                return str.toLowerCase()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '');
+            }
+
+            // --- CONSTRUCTION D'UNE BARRE GÉNÉRIQUE ---
+            function buildBar(options) {
+                const { items, wrapperEl, legendsEl, totalStart, totalEnd, minRowHeight, showPeriodSegments, isCumul } = options;
+                const refDate = getCurrentDate();
+
+                wrapperEl.querySelectorAll('.progress-period, .event-marker, .floating-label').forEach(el => el.remove());
+                legendsEl.innerHTML = '';
+
+                wrapperEl.classList.toggle('cumul-wrapper', !!isCumul);
+
+                if (items.length === 0) {
+                    legendsEl.style.minHeight = '0';
+                    return;
+                }
+
+                const wrapperRect = wrapperEl.getBoundingClientRect();
+                const containerWidth = legendsEl.getBoundingClientRect().width || wrapperRect.width;
+
+                items.forEach(item => {
+                    const s = Math.max(0, getProgress(item.start, totalStart, totalEnd));
+                    const e = Math.min(1, getProgress(item.end, totalStart, totalEnd));
+                    if (e <= 0 || s >= 1) return;
+
+                    const leftPct = item.explicitLeft !== undefined ? item.explicitLeft : s * 100;
+                    const widthPct = item.explicitWidth !== undefined ? item.explicitWidth : (e - s) * 100;
+
+                    if (showPeriodSegments !== false) {
+                        const seg = document.createElement('div');
+                        seg.className = 'progress-period';
+                        seg.dataset.evtId = item.id;
+                        seg.style.left = leftPct + '%';
+                        seg.style.width = widthPct + '%';
+                        seg.style.backgroundColor = item.color;
+                        wrapperEl.appendChild(seg);
+                    }
+
+                    if (item.isInstant) {
+                        const marker = document.createElement('div');
+                        marker.className = 'event-marker';
+                        marker.dataset.evtId = item.id;
+                        marker.style.left = leftPct + '%';
+                        marker.style.backgroundColor = item.color;
+                        wrapperEl.appendChild(marker);
+                    }
+
+                    const floatLabel = document.createElement('div');
+                    floatLabel.className = 'floating-label';
+                    floatLabel.dataset.evtId = item.id;
+                    floatLabel.style.left = (leftPct + widthPct / 2) + '%';
+                    floatLabel.style.backgroundColor = item.color;
+                    floatLabel.style.setProperty('--floating-arrow-color', item.color);
+                    floatLabel.textContent = item.label;
+                    wrapperEl.appendChild(floatLabel);
+                });
+
+                const legendItems = items.map(item => {
+                    const s = Math.max(0, getProgress(item.start, totalStart, totalEnd));
+                    const e = Math.min(1, getProgress(item.end, totalStart, totalEnd));
+                    if (e <= 0 || s >= 1) return null;
+
+                    const leftPct = item.explicitLeft !== undefined ? item.explicitLeft : s * 100;
+                    const widthPct = item.explicitWidth !== undefined ? item.explicitWidth : (e - s) * 100;
+
+                    return {
+                        ...item,
+                        position: (leftPct + widthPct / 2) / 100,
+                        relativeText: item.relativeText || getRelativeText(item.displayDate || item.start, refDate)
+                    };
+                }).filter(Boolean);
+
+                legendItems.sort((a, b) => a.position - b.position);
+
+                const probe = document.createElement('div');
+                probe.className = 'legend-badge';
+                probe.style.position = 'absolute';
+                probe.style.visibility = 'hidden';
+                probe.style.whiteSpace = 'nowrap';
+                legendsEl.appendChild(probe);
+
+                const badgeWidths = legendItems.map(item => {
+                    probe.innerHTML = '<div class="legend-title">' + item.label + '</div>' +
+                                      '<div class="legend-subtitle">' + item.relativeText + '</div>';
+                    const w = probe.getBoundingClientRect().width;
+                    return (w / containerWidth) * 100;
+                });
+
+                legendsEl.removeChild(probe);
+
+                const positioned = [];
+                const rowOccupancy = [];
+
+                legendItems.forEach((item, idx) => {
+                    const w = badgeWidths[idx];
+                    const halfW = w / 2;
+                    let row = 0;
+                    let pos = item.position * 100;
+
+                    while (true) {
+                        if (!rowOccupancy[row]) rowOccupancy[row] = [];
+                        const occupied = rowOccupancy[row];
+                        let overlap = false;
+                        for (const interval of occupied) {
+                            if (pos + halfW > interval[0] && pos - halfW < interval[1]) {
+                                overlap = true;
+                                break;
+                            }
+                        }
+                        if (!overlap) break;
+                        row++;
+                    }
+
+                    const minPos = halfW + 0.5;
+                    const maxPos = 100 - halfW - 0.5;
+                    pos = Math.max(minPos, Math.min(maxPos, pos));
+
+                    rowOccupancy[row].push([pos - halfW, pos + halfW]);
+                    positioned.push({ ...item, pos, row });
+                });
+
+                const ROW_BASE_HEIGHT_REM = minRowHeight || 4.5;
+                const ROW_GAP_REM = 0.8;
+                const FIRST_ROW_OFFSET_REM = 0.4;
+
+                const rowHeights = [];
+                positioned.forEach(item => {
+                    if (!rowHeights[item.row]) rowHeights[item.row] = 0;
+                    rowHeights[item.row] = Math.max(rowHeights[item.row], 3.5);
+                });
+
+                const rowTops = [];
+                let cumulativeTop = FIRST_ROW_OFFSET_REM;
+                for (let r = 0; r < rowHeights.length; r++) {
+                    rowTops[r] = cumulativeTop;
+                    cumulativeTop += (rowHeights[r] || ROW_BASE_HEIGHT_REM) + ROW_GAP_REM;
+                }
+
+                const totalLegendsHeight = cumulativeTop + 0.5;
+                legendsEl.style.minHeight = totalLegendsHeight + 'rem';
+
+                positioned.forEach(item => {
+                    const targetTop = rowTops[item.row];
+                    const connectorHeight = targetTop;
+
+                    const legend = document.createElement('div');
+                    legend.className = 'legend-item';
+                    legend.dataset.evtId = item.id;
+                    legend.style.left = item.pos + '%';
+                    legend.style.height = (targetTop + 4) + 'rem';
+                    legend.style.width = '0';
+                    legend.style.top = '0';
+
+                    const connector = document.createElement('div');
+                    connector.className = 'legend-connector';
+                    connector.style.height = connectorHeight + 'rem';
+                    connector.style.backgroundColor = item.color;
+                    connector.style.top = '0';
+                    legend.appendChild(connector);
+
+                    const badge = document.createElement('div');
+                    badge.className = 'legend-badge';
+                    badge.style.backgroundColor = item.color;
+                    badge.style.top = targetTop + 'rem';
+
+                    const title = document.createElement('div');
+                    title.className = 'legend-title';
+                    title.textContent = item.label;
+                    badge.appendChild(title);
+
+                    const subtitle = document.createElement('div');
+                    subtitle.className = 'legend-subtitle';
+                    subtitle.textContent = item.relativeText;
+                    badge.appendChild(subtitle);
+
+                    legend.appendChild(badge);
+                    legendsEl.appendChild(legend);
+                });
+
+                wrapperEl.querySelectorAll('.progress-period, .event-marker').forEach(el => {
+                    el.addEventListener('mouseenter', () => applyHighlight(el.dataset.evtId, wrapperEl));
+                    el.addEventListener('mouseleave', () => applyHighlight(null, wrapperEl));
+                });
+                legendsEl.querySelectorAll('.legend-item').forEach(el => {
+                    el.addEventListener('mouseenter', () => applyHighlight(el.dataset.evtId, wrapperEl));
+                    el.addEventListener('mouseleave', () => applyHighlight(null, wrapperEl));
+                });
+            }
+
+            function applyHighlight(id, wrapperEl) {
+                const zone = wrapperEl.closest('.progress-bar-zone');
+                if (!zone) return;
+
+                if (!id) {
+                    zone.classList.remove('has-hover');
+                    zone.querySelectorAll('.is-highlighted').forEach(el => el.classList.remove('is-highlighted'));
+                    zone.querySelectorAll('.floating-label').forEach(el => el.classList.remove('visible'));
+                    return;
+                }
+
+                zone.classList.add('has-hover');
+                zone.querySelectorAll('.progress-period, .event-marker, .legend-item').forEach(el => {
+                    el.classList.toggle('is-highlighted', el.dataset.evtId === id);
+                });
+                zone.querySelectorAll('.floating-label').forEach(el => {
+                    el.classList.toggle('visible', el.dataset.evtId === id);
+                });
+            }
+
+            // --- BARRE PRINCIPALE ---
+            function buildMainBar() {
+                const mainItems = [];
+
+                periodEvents.forEach(p => {
+                    mainItems.push({
+                        id: p.id,
+                        label: p.label,
+                        start: p.start,
+                        end: p.end,
+                        color: p.color,
+                        isInstant: false,
+                        displayDate: p.start
+                    });
+                });
+
+                instantEvents.forEach(evt => {
+                    mainItems.push({
+                        id: evt.id,
+                        label: evt.label,
+                        start: evt.date,
+                        end: evt.date,
+                        color: evt.color,
+                        isInstant: true,
+                        displayDate: evt.date
+                    });
+                });
+
+                mainItems.sort((a, b) => a.start - b.start);
+
+                buildBar({
+                    items: mainItems,
+                    wrapperEl: document.getElementById('mainWrapper'),
+                    legendsEl: document.getElementById('mainLegends'),
+                    totalStart: startDate,
+                    totalEnd: endDate,
+                    minRowHeight: 5.5,
+                    showPeriodSegments: true,
+                    isCumul: false
+                });
+            }
+
+            // --- OPTIONS DE LA BARRE ANNEXE ---
+            function buildAnnexOptions() {
+                annexOptions = [];
+
+                annexOptions.push({
+                    id: 'cumul',
+                    category: 'Vue d\'ensemble',
+                    label: 'Vacances cumulées de l\'année',
+                    searchText: 'vacances cumulees ensemble total annee',
+                    build: buildCumulBar,
+                    update: updateCumulBar
+                });
+
+                periodEvents.forEach(p => {
+                    annexOptions.push({
+                        id: 'progress-' + p.id,
+                        category: 'Avancement',
+                        label: 'Avancement : ' + p.label,
+                        searchText: 'avancement progression ' + p.label,
+                        build: () => buildPeriodBar(p),
+                        update: () => updatePeriodBar(p)
+                    });
+                });
+
+                instantEvents.forEach(evt => {
+                    annexOptions.push({
+                        id: 'remaining-' + evt.id,
+                        category: 'Temps restant',
+                        label: 'Temps restant : ' + evt.label,
+                        searchText: 'temps restant avant ' + evt.label,
+                        build: () => buildInstantBar(evt),
+                        update: () => updateInstantBar(evt)
+                    });
+                });
+            }
+
+            function buildPeriodBar(period) {
+                buildBar({
+                    items: [{
+                        id: period.id,
+                        label: period.label,
+                        start: period.start,
+                        end: period.end,
+                        color: period.color,
+                        isInstant: false,
+                        displayDate: period.start
+                    }],
+                    wrapperEl: document.getElementById('annexWrapper'),
+                    legendsEl: document.getElementById('annexLegends'),
+                    totalStart: period.start,
+                    totalEnd: period.end,
+                    minRowHeight: 4,
+                    showPeriodSegments: false,
+                    isCumul: false
+                });
+                const fill = document.getElementById('annexFill');
+                fill.style.background = period.color;
+            }
+
+            function updatePeriodBar(period) {
+                const fill = document.getElementById('annexFill');
+                const refDate = getCurrentDate();
+                const progress = getProgress(refDate, period.start, period.end);
+                fill.style.width = (progress * 100) + '%';
+
+                const total = daysBetween(period.start, period.end);
+                const elapsed = Math.max(0, Math.min(total, daysBetween(period.start, refDate)));
+                document.getElementById('annexSummary').textContent =
+                    'Avancement : ' + elapsed + ' / ' + total + ' jours (' + Math.round(progress * 100) + '%)';
+            }
+
+            function buildInstantBar(evt) {
+                buildBar({
+                    items: [{
+                        id: evt.id,
+                        label: evt.label,
+                        start: startDate,
+                        end: evt.date,
+                        color: evt.color,
+                        isInstant: false,
+                        displayDate: evt.date
+                    }],
+                    wrapperEl: document.getElementById('annexWrapper'),
+                    legendsEl: document.getElementById('annexLegends'),
+                    totalStart: startDate,
+                    totalEnd: evt.date,
+                    minRowHeight: 4,
+                    showPeriodSegments: false,
+                    isCumul: false
+                });
+                const fill = document.getElementById('annexFill');
+                fill.style.background = evt.color;
+            }
+
+            function updateInstantBar(evt) {
+                const fill = document.getElementById('annexFill');
+                const refDate = getCurrentDate();
+                const progress = getProgress(refDate, startDate, evt.date);
+                fill.style.width = (progress * 100) + '%';
+
+                const total = daysBetween(startDate, evt.date);
+                const elapsed = Math.max(0, Math.min(total, daysBetween(startDate, refDate)));
+                const remaining = Math.max(0, total - elapsed);
+                document.getElementById('annexSummary').textContent =
+                    'Temps restant : ' + remaining + ' jours sur ' + total + ' (' + Math.round(progress * 100) + '% écoulé)';
+            }
+
+            // --- BARRE CUMULÉE ---
+            function buildCumulBar() {
+                const wrapper = document.getElementById('annexWrapper');
+                const legendsEl = document.getElementById('annexLegends');
+                const fill = document.getElementById('annexFill');
+
+                wrapper.querySelectorAll('.progress-period, .event-marker, .floating-label').forEach(el => el.remove());
+                legendsEl.innerHTML = '';
+
+                const segments = periodEvents.map(p => {
+                    const days = daysBetween(p.start, p.end);
+                    return { ...p, days };
+                });
+                const totalDays = segments.reduce((acc, s) => acc + s.days, 0);
+
+                fill.style.background = 'transparent';
+                fill.style.width = '0%';
+
+                const cumulItems = [];
+                let currentPos = 0;
+
+                segments.forEach(seg => {
+                    const widthPct = (seg.days / totalDays) * 100;
+
+                    cumulItems.push({
+                        id: 'cumul-' + seg.id,
+                        label: seg.label,
+                        start: seg.start,
+                        end: seg.end,
+                        color: seg.color,
+                        isInstant: false,
+                        explicitLeft: currentPos,
+                        explicitWidth: widthPct,
+                        relativeText: seg.days + ' jours',
+                        displayDate: seg.start
+                    });
+
+                    currentPos += widthPct;
+                });
+
+                buildBar({
+                    items: cumulItems,
+                    wrapperEl: wrapper,
+                    legendsEl: legendsEl,
+                    totalStart: startDate,
+                    totalEnd: endDate,
+                    minRowHeight: 4,
+                    showPeriodSegments: true,
+                    isCumul: true
+                });
+
+                updateCumulBar();
+            }
+
+            function updateCumulBar() {
+                const refDate = getCurrentDate();
+                const wrapper = document.getElementById('annexWrapper');
+
+                const totalDays = periodEvents.reduce((acc, p) => acc + daysBetween(p.start, p.end), 0);
+
+                let elapsedDays = 0;
+                periodEvents.forEach(p => {
+                    const total = daysBetween(p.start, p.end);
+                    if (refDate >= p.end) {
+                        elapsedDays += total;
+                    } else if (refDate > p.start) {
+                        elapsedDays += daysBetween(p.start, refDate);
+                    }
+                });
+
+                const progress = totalDays > 0 ? elapsedDays / totalDays : 0;
+
+                let overlay = wrapper.querySelector('.cumul-progress-overlay');
+                if (!overlay) {
+                    overlay = document.createElement('div');
+                    overlay.className = 'cumul-progress-overlay';
+                    overlay.style.position = 'absolute';
+                    overlay.style.top = '0';
+                    overlay.style.left = '0';
+                    overlay.style.height = '100%';
+                    overlay.style.background = 'rgba(255, 255, 255, 0.55)';
+                    overlay.style.zIndex = '4';
+                    overlay.style.pointerEvents = 'none';
+                    overlay.style.transition = 'width 0.5s ease-in-out';
+                    wrapper.appendChild(overlay);
+                }
+                overlay.style.left = (progress * 100) + '%';
+                overlay.style.width = ((1 - progress) * 100) + '%';
+
+                document.getElementById('annexSummary').textContent =
+                    elapsedDays + ' jours de vacances écoulés sur ' + totalDays + ' (' + Math.round(progress * 100) + '%)';
+            }
+
+            // --- SÉLECTEUR AVEC RECHERCHE ---
+            function initSelector() {
+                const select = document.getElementById('annexSelector');
+                const searchInput = document.getElementById('annexSearch');
+
+                function populateSelect(filter) {
+                    const filterNorm = normalize(filter || '').trim();
+                    const previousValue = currentAnnexId;
+                    select.innerHTML = '';
+
+                    const groups = {};
+                    annexOptions.forEach(opt => {
+                        const labelNorm = normalize(opt.label);
+                        const searchNorm = normalize(opt.searchText || '');
+                        const matchSearch = !filterNorm ||
+                            labelNorm.includes(filterNorm) ||
+                            searchNorm.includes(filterNorm);
+                        if (!matchSearch) return;
+
+                        if (!groups[opt.category]) groups[opt.category] = [];
+                        groups[opt.category].push(opt);
+                    });
+
+                    if (Object.keys(groups).length === 0) {
+                        const option = document.createElement('option');
+                        option.value = '';
+                        option.textContent = 'Aucun résultat';
+                        option.disabled = true;
+                        option.selected = true;
+                        select.appendChild(option);
+                        return;
+                    }
+
+                    Object.keys(groups).forEach(cat => {
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = cat;
+                        groups[cat].forEach(opt => {
+                            const option = document.createElement('option');
+                            option.value = opt.id;
+                            option.textContent = opt.label;
+                            if (opt.id === previousValue) option.selected = true;
+                            optgroup.appendChild(option);
+                        });
+                        select.appendChild(optgroup);
+                    });
+
+                    if (!select.querySelector('option[value="' + previousValue + '"]:not([disabled])')) {
+                        const firstOption = select.querySelector('option:not([disabled])');
+                        if (firstOption) {
+                            currentAnnexId = firstOption.value;
+                            firstOption.selected = true;
+                        }
+                    }
+                }
+
+                populateSelect('');
+
+                let searchTimer;
+                searchInput.addEventListener('input', () => {
+                    clearTimeout(searchTimer);
+                    searchTimer = setTimeout(() => {
+                        populateSelect(searchInput.value);
+                        rebuildAnnex();
+                    }, 150);
+                });
+
+                select.addEventListener('change', () => {
+                    currentAnnexId = select.value;
+                    rebuildAnnex();
+                });
+            }
+
+            function rebuildAnnex() {
+                const opt = annexOptions.find(o => o.id === currentAnnexId);
+                if (!opt) return;
+
+                const fill = document.getElementById('annexFill');
+                fill.style.width = '0%';
+                fill.style.background = '';
+
+                const wrapper = document.getElementById('annexWrapper');
+                const oldOverlay = wrapper.querySelector('.cumul-progress-overlay');
+                if (oldOverlay) oldOverlay.remove();
+
+                opt.build();
+                opt.update();
+            }
+
+            // --- MISE À JOUR ---
+            function updateMain() {
+                const refDate = getCurrentDate();
+                const mainProgress = getProgress(refDate, startDate, endDate);
+                document.getElementById('mainFill').style.width = (mainProgress * 100) + '%';
+                const permille = Math.round(mainProgress * 10000);
+                document.getElementById('progressPermille').innerHTML = permille.toLocaleString('fr-FR') + ' <span>‱</span>';
+            }
+
+            function updateAll() {
+                if (!startDate || !endDate) return;
+
+                updateMain();
+
+                const opt = annexOptions.find(o => o.id === currentAnnexId);
+                if (opt) opt.update();
+
+                const refDate = getCurrentDate();
+                document.querySelectorAll('#mainLegends .legend-item').forEach(legend => {
+                    const subtitle = legend.querySelector('.legend-subtitle');
+                    if (!subtitle) return;
+                    const id = legend.dataset.evtId;
+                    let evtDate = null;
+                    const p = periodEvents.find(x => x.id === id);
+                    if (p) evtDate = p.start;
+                    const i = instantEvents.find(x => x.id === id);
+                    if (i) evtDate = i.date;
+                    if (evtDate) subtitle.textContent = getRelativeText(evtDate, refDate);
+                });
+            }
+
+            // --- CHARGEMENT DES DONNÉES DEPUIS events.json ---
+            async function loadEvents() {
+                const loadingMessage = document.getElementById('loadingMessage');
+
+                try {
+                    const response = await fetch('./events.json');
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status + ' - ' + response.statusText);
+                    }
+                    config = await response.json();
+
+                    // Validation minimale de la structure
+                    if (!config.startDate || !config.endDate) {
+                        throw new Error('Le fichier events.json doit contenir "startDate" et "endDate".');
+                    }
+
+                    // Conversion des dates
+                    startDate = new Date(config.startDate);
+                    endDate = new Date(config.endDate);
+
+                    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+                        throw new Error('Format de date invalide dans events.json');
+                    }
+
+                    if (startDate >= endDate) {
+                        throw new Error('La date de début doit être antérieure à la date de fin.');
+                    }
+
+                    // Conversion des événements instantanés
+                    instantEvents = (config.instantEvents || []).map(evt => ({
+                        id: evt.id,
+                        label: evt.label,
+                        date: new Date(evt.date),
+                        color: evt.color || '#643c00'
+                    })).filter(evt => !isNaN(evt.date.getTime()));
+
+                    // Conversion des périodes
+                    periodEvents = (config.periodEvents || []).map(p => ({
+                        id: p.id,
+                        label: p.label,
+                        start: new Date(p.start),
+                        end: new Date(p.end),
+                        color: p.color || '#008673'
+                    })).filter(p => !isNaN(p.start.getTime()) && !isNaN(p.end.getTime()));
+
+                    // Titre personnalisé
+                    if (config.title) {
+                        document.getElementById('mainTitle').textContent = config.title;
+                    }
+
+                    // Cacher le message de chargement, afficher le contenu
+                    loadingMessage.style.display = 'none';
+                    document.getElementById('mainSection').style.display = '';
+                    document.getElementById('annexBlock').style.display = '';
+
+                    // Initialisation
+                    buildAnnexOptions();
+                    initSelector();
+                    buildMainBar();
+                    rebuildAnnex();
+                    updateAll();
+
+                    setInterval(updateAll, 60000);
+
+                    let resizeTimer;
+                    window.addEventListener('resize', () => {
+                        clearTimeout(resizeTimer);
+                        resizeTimer = setTimeout(() => {
+                            buildMainBar();
+                            rebuildAnnex();
+                            updateAll();
+                        }, 250);
+                    });
+
+                } catch (err) {
+                    console.error('Erreur de chargement des événements :', err);
+                    loadingMessage.classList.add('error');
+                    loadingMessage.innerHTML =
+                        '❌ Impossible de charger les événements.<br>' +
+                        '<small>' + err.message + '</small><br><br>' +
+                        '<small>Vérifiez que <code>./events.json</code> existe et est accessible.</small>';
+                }
+            }
+
+            // --- DÉMARRAGE ---
+            loadEvents();
+        })();
+    </script>
+</body>
+</html>
