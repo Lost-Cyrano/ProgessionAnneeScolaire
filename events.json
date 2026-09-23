@@ -10,12 +10,12 @@
         { "id": "parcoursup_voeux_fin",   "label": "Dernier jour pour formuler vos vœux Parcoursup",                "date": "2027-03-13T00:00:00", "color": "#2e7d32" },
         { "id": "parcoursup_dossier_fin", "label": "Dernier jour pour compléter votre dossier et confirmer vos vœux","date": "2027-04-02T00:00:00", "color": "#2e7d32" },
         { "id": "philo",                  "label": "Épreuves de philosophie",                                       "date": "2027-06-14T00:00:00", "color": "#c62828" },
-        { "id": "francais_ecrit",         "label": "Épreuves écrites anticipées de français",                        "date": "2027-06-15T00:00:00", "color": "#c62828" },
+        { "id": "francais_ecrit",         "label": "Épreuves écrites anticipées de français",                       "date": "2027-06-15T00:00:00", "color": "#c65728" },
         { "id": "specialites_1",          "label": "Épreuves écrites de spécialités (jour 1)",                      "date": "2027-06-16T00:00:00", "color": "#c62828" },
         { "id": "specialites_2",          "label": "Épreuves écrites de spécialités (jour 2)",                      "date": "2027-06-17T00:00:00", "color": "#c62828" },
         { "id": "specialites_3",          "label": "Épreuves écrites de spécialités (jour 3)",                      "date": "2027-06-18T00:00:00", "color": "#c62828" },
-        { "id": "maths_ecrit",            "label": "Épreuves écrites anticipées de mathématiques",                   "date": "2027-06-21T00:00:00", "color": "#c62828" },
-        { "id": "resultats",              "label": "Communication des résultats",                                    "date": "2027-07-06T00:00:00", "color": "#2e7d32" }
+        { "id": "maths_ecrit",            "label": "Épreuves écrites anticipées de mathématiques",                  "date": "2027-06-21T00:00:00", "color": "#c65728" },
+        { "id": "resultats",              "label": "Début de la communication des résultats du BAC",                "date": "2027-07-06T00:00:00", "color": "#2e7d32" }
     ],
     "vacationEvents": [
         { "id": "toussaint", "label": "Toussaint", "start": "2026-10-18T00:00:00", "end": "2026-11-02T00:00:00", "color": "#aa6600" },
@@ -24,7 +24,7 @@
         { "id": "paques",    "label": "Pâques",    "start": "2027-03-28T00:00:00", "end": "2027-03-30T00:00:00", "color": "#935ec7" },
         { "id": "printemps", "label": "Printemps", "start": "2027-04-18T00:00:00", "end": "2027-05-03T00:00:00", "color": "#11acb1" },
         { "id": "ascension", "label": "Ascension", "start": "2027-05-06T00:00:00", "end": "2027-05-10T00:00:00", "color": "#b9335f" },
-        { "id": "pentecote", "label": "Pentecôte", "start": "2027-05-16T00:00:00", "end": "2027-05-18T00:00:00", "color": "#df2121" }
+        { "id": "pentecote", "label": "Pentecôte", "start": "2027-05-16T00:00:00", "end": "2027-05-18T00:00:00", "color": "#c6286a" }
     ],
     "parcoursupEvents": [
         { "id": "parcoursup_inscription",    "label": "Inscription sur Parcoursup et formulation des vœux", "start": "2027-01-15T00:00:00", "end": "2027-03-13T00:00:00", "color": "#2e7d32" },
@@ -33,6 +33,10 @@
     ],
     "examEvents": [
         { "id": "grand_oral",    "label": "Grand oral",                 "start": "2027-06-21T00:00:00", "end": "2027-07-02T00:00:00", "color": "#c62828" },
-        { "id": "francais_oral", "label": "Épreuve orale de français",  "start": "2027-06-21T00:00:00", "end": "2027-07-09T00:00:00", "color": "#c62828" }
+        { "id": "francais_oral", "label": "Épreuve orale de français",  "start": "2027-06-21T00:00:00", "end": "2027-07-09T00:00:00", "color": "#c65728" }
+    ],
+    ,
+    "autres": [
+        { "id": "election_cvl", "label": "Élections du CVL", "start": "2026-10-05T00:00:00", "end": "2026-10-09T00:00:00", "color": "#643c00" }
     ]
 }
