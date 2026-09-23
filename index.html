@@ -86,12 +86,11 @@
             width: 100%;
         }
 
-        /* Conteneur de la barre : une seule barre visuelle,
-           dans laquelle les segments sont superposés verticalement
-           à l'intérieur de sa hauteur. */
+        /* Barre de progression : les segments superposés sont affichés
+           en bandes horizontales à l'intérieur de cette unique barre. */
         .progress-bar-wrapper {
             width: 100%;
-            height: 3.2rem;
+            height: 4.5rem;
             background-color: #e2e2e2;
             border-radius: 0.4rem;
             position: relative;
@@ -123,17 +122,26 @@
             background: none;
         }
 
-        /* Segments colorés des périodes. Ils sont superposés verticalement
-           dans la barre : chaque segment a une hauteur partielle selon sa
-           profondeur dans la pile de chevauchement. */
+        /* Segments colorés des périodes.
+           Chaque segment a une "row" (profondeur) et est placé dans une bande
+           horizontale de la barre. Aucun segment n'est plus petit qu'un autre
+           en termes de largeur — seule la hauteur varie pour permettre la
+           superposition verticale. */
         .progress-period {
             position: absolute;
-            left: 0;
             z-index: 2;
-            opacity: 0.9;
-            transition: opacity 0.25s ease, filter 0.25s ease;
+            opacity: 0.95;
+            transition: opacity 0.25s ease, filter 0.25s ease, transform 0.2s ease;
             cursor: pointer;
-            border-radius: 0.2rem;
+            /* Le top et la height sont définis inline */
+            border-radius: 0;
+            /* Bordure fine pour démarquer les segments superposés */
+            border-top: 0.1rem solid rgba(255, 255, 255, 0.9);
+            border-bottom: 0.1rem solid rgba(0, 0, 0, 0.15);
+        }
+
+        .progress-period:first-of-type {
+            border-top: none;
         }
 
         .annex-block .progress-bar-wrapper:not(.cumul-wrapper) .progress-period {
@@ -144,7 +152,8 @@
             display: block;
             opacity: 1;
             border-right: 0.1rem solid rgba(255, 255, 255, 0.7);
-            border-radius: 0;
+            border-top: none;
+            border-bottom: none;
         }
 
         .cumul-wrapper .progress-period:last-child {
@@ -219,13 +228,15 @@
         .legend-item {
             position: absolute;
             display: block;
-            pointer-events: auto;
+            pointer-events: none; /* le conteneur ne capte pas la souris, seul le badge le fait */
             transition: opacity 0.25s ease, filter 0.25s ease;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
         }
 
-        /* Le connecteur est positionné en absolu dans .legend-item.
-           Son left est calculé pour pointer exactement sur l'ancre
-           (position sur la barre), indépendamment du décalage du badge. */
+        /* Le connecteur est un trait vertical positionné sur l'ancre */
         .legend-connector {
             position: absolute;
             top: 0;
@@ -235,6 +246,7 @@
             transform: translateX(-50%);
         }
 
+        /* Le badge est cliquable et positionné indépendamment */
         .legend-badge {
             position: absolute;
             transform: translateX(-50%);
@@ -255,6 +267,7 @@
             flex-direction: column;
             align-items: center;
             gap: 0.3rem;
+            pointer-events: auto; /* le badge capte la souris */
         }
 
         .legend-badge .legend-title {
@@ -269,6 +282,7 @@
             font-style: italic;
         }
 
+        /* Mise en évidence : on grise tout sauf l'élément survolé */
         .progress-bar-zone.has-hover .legend-item:not(.is-highlighted),
         .progress-bar-zone.has-hover .progress-period:not(.is-highlighted),
         .progress-bar-zone.has-hover .event-marker:not(.is-highlighted) {
@@ -280,6 +294,12 @@
             box-shadow: 0 0.4rem 1rem rgba(0, 0, 0, 0.4);
             transform: translateX(-50%) scale(1.05);
             z-index: 10;
+        }
+
+        /* Quand une légende est en évidence, on remonte son badge au-dessus de la barre
+           pour faciliter la lecture lorsque plusieurs légendes sont proches. */
+        .legend-item.is-highlighted .legend-badge {
+            /* Le badge est déjà au-dessus de la barre dans le DOM */
         }
 
         .annex-block {
@@ -407,7 +427,7 @@
             .progress-title { font-size: 1.7rem; }
             .progress-permille { font-size: 3.6rem; }
             .progress-permille span { font-size: 1.8rem; }
-            .progress-bar-wrapper { height: 2.8rem; }
+            .progress-bar-wrapper { height: 4rem; }
             .legend-badge { font-size: 1.2rem; padding: 0.5rem 0.8rem; }
             .legend-badge .legend-title { font-size: 1.2rem; }
             .legend-badge .legend-subtitle { font-size: 0.9rem; }
@@ -420,7 +440,7 @@
             .progress-title { font-size: 1.3rem; }
             .progress-permille { font-size: 2.6rem; }
             .progress-permille span { font-size: 1.3rem; }
-            .progress-bar-wrapper { height: 2.2rem; }
+            .progress-bar-wrapper { height: 3.2rem; }
             .legend-badge { font-size: 1rem; padding: 0.4rem 0.6rem; }
             .legend-badge .legend-title { font-size: 1rem; }
             .legend-badge .legend-subtitle { font-size: 0.8rem; }
@@ -446,7 +466,7 @@
     <div class="progress-container">
         <h1 class="progress-title" id="mainTitle">Progression de l'année scolaire</h1>
 
-        <!-- Barre principale (une seule) -->
+        <!-- Barre principale -->
         <div class="progress-section" id="mainSection" style="display: none;">
             <p class="progress-permille" id="progressPermille">0 <span>‱</span></p>
             <div class="progress-bar-zone" id="mainZone">
@@ -498,6 +518,7 @@
             let instantEvents = [];
             let vacationEvents = [];
             let parcoursupEvents = [];
+            let examEvents = [];
             let annexOptions = [];
             let currentAnnexId = 'cumul-vac';
             let config = null;
@@ -542,8 +563,9 @@
             }
 
             // --- REGROUPEMENT DES PÉRIODES PAR SUPERPOSITION ---
-            // Renvoie un tableau de "piles". Chaque pile est un tableau de périodes
-            // triées par durée décroissante (la plus longue en premier = plus profond).
+            // Renvoie un tableau de "piles". Chaque pile contient des périodes qui
+            // se chevauchent entre elles (directement ou transitivement via une
+            // autre période de la pile).
             function groupPeriodsByOverlap(periods) {
                 const sorted = [...periods].sort((a, b) => a.start - b.start);
                 const stacks = [];
@@ -565,6 +587,7 @@
                     }
                 });
 
+                // Trier chaque pile par durée décroissante (plus longue = plus profond)
                 stacks.forEach(stack => {
                     stack.sort((a, b) => (b.end - b.start) - (a.end - a.start));
                 });
@@ -599,37 +622,24 @@
                 const wrapperRect = wrapperEl.getBoundingClientRect();
                 const containerWidth = legendsEl.getBoundingClientRect().width || wrapperRect.width;
 
-                // --- Calcul des profondeurs pour la superposition ---
-                // On regroupe les périodes en piles, puis pour chaque période on
-                // détermine sa profondeur (depth) dans sa pile.
+                // --- Superposition verticale des segments ---
+                // Pour chaque période, on calcule sa profondeur (depth) dans sa pile.
                 const stacks = groupPeriodsByOverlap(periodItems);
-
-                // Map id -> depth
                 const depthMap = {};
-                // Map id -> maxDepth (pour la normalisation de la hauteur)
-                const stackMap = {};
-                stacks.forEach((stack, stackIdx) => {
+                stacks.forEach(stack => {
                     stack.forEach((p, depth) => {
                         depthMap[p.id] = depth;
-                        stackMap[p.id] = stack.length;
                     });
                 });
 
-                // Pour chaque segment, on calcule sa hauteur et son top dans la barre
-                // selon sa profondeur : la plus longue occupe toute la hauteur,
-                // la plus courte est plus fine et placée en haut.
-                const maxStackSize = stacks.reduce((max, s) => Math.max(max, s.length), 1);
+                // Hauteur de chaque bande : la barre est divisée en autant de bandes
+                // que le nombre maximum de périodes superposées dans une pile.
+                const maxDepth = stacks.reduce((max, s) => Math.max(max, s.length), 1);
+                // Chaque bande fait 1/maxDepth de la hauteur totale
+                const bandHeightPct = 100 / maxDepth;
 
-                // Barre height en rem (défini en CSS : 3.2rem en desktop, moins en mobile).
-                // On utilise une hauteur proportionnelle pour chaque segment.
-                // Chaque niveau "depth" occupe une bande horizontale dans la barre.
-                // On divise la hauteur de la barre en `maxStackSize` bandes.
-                // La bande du dessus (depth max) est la plus courte, celle du fond (depth 0)
-                // est la plus longue et occupe toute la hauteur.
-
-                // -- Rendus des segments sur la barre --
+                // --- Rendu des segments ---
                 items.forEach(item => {
-                    // Cas des instants : on les traite différemment
                     if (item.isInstant) {
                         const p = getProgress(item.start, totalStart, totalEnd);
                         if (p < 0 || p > 1) return;
@@ -652,7 +662,6 @@
                         return;
                     }
 
-                    // Cas des périodes
                     if (showPeriodSegments === false) return;
 
                     const s = Math.max(0, getProgress(item.start, totalStart, totalEnd));
@@ -662,22 +671,24 @@
                     const leftPct = item.explicitLeft !== undefined ? item.explicitLeft : s * 100;
                     const widthPct = item.explicitWidth !== undefined ? item.explicitWidth : (e - s) * 100;
 
+                    // Profondeur de ce segment : 0 = le plus profond (le plus long)
                     const depth = depthMap[item.id] !== undefined ? depthMap[item.id] : 0;
-                    const stackSize = stackMap[item.id] || 1;
 
-                    // Hauteur de la bande : on divise la hauteur totale en stackSize bandes
-                    // Chaque bande fait 100/stackSize % de la hauteur.
-                    // On ajoute une petite marge entre les bandes.
-                    const bandHeightPct = 100 / stackSize;
-                    // La bande du depth 0 (plus long) est en bas, celle du depth max en haut.
-                    // On place le segment de bas en haut : depth 0 -> top = 0, height = 100%
-                    // Pour que toutes les périodes d'une même pile soient visibles,
-                    // on rétrécit chaque segment en fonction de sa profondeur.
-                    // Formule : top = depth * (bandHeight), height = 100 - top
-                    // -> la plus profonde (depth 0) occupe 100% de la hauteur,
-                    //    la suivante (depth 1) occupe top=bandHeight, height=100-bandHeight,
-                    //    etc.
-                    // Cela crée un effet d'escalier où chaque période plus courte
+                    // Position verticale : la profondeur 0 est en bas de la barre,
+                    // la profondeur maxDepth-1 est en haut.
+                    // Pour que toutes les périodes soient visibles, on attribue à
+                    // chaque segment une bande horizontale de hauteur bandHeightPct.
+                    // La bande d'indice depth part du bas.
+                    // top en % = (maxDepth - 1 - depth) * bandHeightPct
+                    // height en % = bandHeightPct
+                    // Mais pour que la période la plus longue occupe toute la
+                    // hauteur si elle est seule, on utilise une hauteur qui
+                    // s'étend du bas de la barre jusqu'au bas de sa bande.
+                    // Formule : top = depth * bandHeightPct ; height = 100 - top
+                    // -> depth 0 : top=0, height=100% (occupe toute la barre)
+                    // -> depth 1 : top=bandHeight, height=100-bandHeight
+                    // -> depth k : top=k*bandHeight, height=100-k*bandHeight
+                    // Cela crée une pile d'escalier où chaque période plus courte
                     // est visible au-dessus des plus longues.
                     const topPct = depth * bandHeightPct;
                     const heightPct = 100 - topPct;
@@ -703,7 +714,6 @@
                 });
 
                 // --- Construction des légendes ---
-                // Pour chaque item, on calcule son ancre (position réelle sur la barre)
                 const legendItems = [];
 
                 periodItems.forEach(p => {
@@ -755,29 +765,28 @@
 
                 legendsEl.removeChild(probe);
 
-                // --- Placement des badges en cascade ---
-                // On garde l'ancre FIXE. On décale le badge horizontalement si nécessaire
-                // pour éviter les chevauchements. Le connecteur pointera TOUJOURS vers
-                // l'ancre réelle.
+                // --- Placement des légendes en cascade ---
+                // IMPORTANT : on gère un tableau "rowOccupancy" qui contient pour
+                // chaque ligne la liste des intervalles occupés. Un badge ne peut
+                // PAS être placé sur une ligne s'il chevauche un badge déjà placé
+                // sur cette même ligne. Ceci garantit qu'aucun badge n'en cache un autre.
                 const positioned = [];
                 const rowOccupancy = [];
 
                 legendItems.forEach((item, idx) => {
                     const w = badgeWidths[idx];
                     const halfW = w / 2;
-                    let row = 0;
-                    let pos = item.anchorPct; // On part de l'ancre
 
-                    // Ajustement horizontal d'abord pour ne pas sortir du conteneur :
-                    // le badge ne doit pas dépasser les bords. Si c'est le cas, on le
-                    // décale vers l'intérieur, mais le connecteur pointera toujours
-                    // vers l'ancre.
+                    // On essaie de placer le badge sur la première ligne où il ne
+                    // chevauche pas un badge existant, en partant de l'ancre réelle
+                    // et en décalant horizontalement si nécessaire pour ne pas
+                    // sortir du conteneur.
+                    let row = 0;
+                    let pos = item.anchorPct;
                     const minPos = halfW + 0.5;
                     const maxPos = 100 - halfW - 0.5;
                     pos = Math.max(minPos, Math.min(maxPos, pos));
 
-                    // Chercher la première ligne où le badge (centré sur pos) ne
-                    // chevauche aucun autre badge
                     while (true) {
                         if (!rowOccupancy[row]) rowOccupancy[row] = [];
                         const occupied = rowOccupancy[row];
@@ -816,21 +825,27 @@
 
                 legendsEl.style.minHeight = (cumulativeTop + 1.5) + 'rem';
 
+                // --- Rendu des légendes ---
+                // Le conteneur .legend-item occupe toute la largeur, positionné en
+                // absolu. Le connecteur est positionné à l'ancre (anchorPct), et le
+                // badge à la position calculée (pos).
+                // Grâce à pointer-events: none sur .legend-item et pointer-events: auto
+                // sur .legend-badge, seul le badge est cliquable — le reste ne bloque
+                // pas la souris. Ainsi, chaque badge est bien sélectionnable même s'il
+                // y a beaucoup de légendes proches.
                 positioned.forEach(item => {
                     const targetTop = rowTops[item.row];
 
                     const legend = document.createElement('div');
                     legend.className = 'legend-item';
                     legend.dataset.evtId = item.id;
-                    // Le conteneur est positionné à 0% (left:0) pour que les enfants
-                    // puissent être positionnés librement en % de la largeur du conteneur.
+                    legend.style.top = '0';
                     legend.style.left = '0';
                     legend.style.width = '100%';
                     legend.style.height = (targetTop + 5) + 'rem';
-                    legend.style.top = '0';
 
                     // Connecteur : part de top=0, va jusqu'au badge (targetTop).
-                    // Il est positionné sur l'ancre (anchorPct), pas sur le badge.
+                    // Positionné à l'ancre réelle.
                     const connector = document.createElement('div');
                     connector.className = 'legend-connector';
                     connector.style.height = targetTop + 'rem';
@@ -839,7 +854,7 @@
                     connector.style.left = item.anchorPct + '%';
                     legend.appendChild(connector);
 
-                    // Badge : positionné à "pos", indépendamment de l'ancre
+                    // Badge : positionné à "pos"
                     const badge = document.createElement('div');
                     badge.className = 'legend-badge';
                     badge.style.backgroundColor = item.color;
@@ -860,13 +875,17 @@
                     legendsEl.appendChild(legend);
                 });
 
-                // Survol
+                // Survol : on attache les événements au badge uniquement
+                // (et aux segments de la barre).
                 wrapperEl.querySelectorAll('.progress-period, .event-marker').forEach(el => {
                     el.addEventListener('mouseenter', () => applyHighlight(el.dataset.evtId, wrapperEl));
                     el.addEventListener('mouseleave', () => applyHighlight(null, wrapperEl));
                 });
-                legendsEl.querySelectorAll('.legend-item').forEach(el => {
-                    el.addEventListener('mouseenter', () => applyHighlight(el.dataset.evtId, wrapperEl));
+                legendsEl.querySelectorAll('.legend-badge').forEach(el => {
+                    const parent = el.closest('.legend-item');
+                    if (!parent) return;
+                    const evtId = parent.dataset.evtId;
+                    el.addEventListener('mouseenter', () => applyHighlight(evtId, wrapperEl));
                     el.addEventListener('mouseleave', () => applyHighlight(null, wrapperEl));
                 });
             }
@@ -926,6 +945,21 @@
                     periodItems.push(item);
                 });
 
+                examEvents.forEach(p => {
+                    const item = {
+                        id: p.id,
+                        label: p.label,
+                        start: p.start,
+                        end: p.end,
+                        color: p.color,
+                        isInstant: false,
+                        displayDate: p.start,
+                        category: 'exam'
+                    };
+                    mainItems.push(item);
+                    periodItems.push(item);
+                });
+
                 instantEvents.forEach(evt => {
                     mainItems.push({
                         id: evt.id,
@@ -975,6 +1009,15 @@
                     update: () => updateCumulBar('parcoursup')
                 });
 
+                annexOptions.push({
+                    id: 'cumul-exam',
+                    category: 'Vue d\'ensemble',
+                    label: 'Périodes d\'examens cumulées',
+                    searchText: 'examens cumulees ensemble total',
+                    build: () => buildCumulBar('exam'),
+                    update: () => updateCumulBar('exam')
+                });
+
                 vacationEvents.forEach(p => {
                     annexOptions.push({
                         id: 'progress-vac-' + p.id,
@@ -992,6 +1035,17 @@
                         category: 'Avancement — Parcoursup',
                         label: 'Parcoursup : ' + p.label,
                         searchText: 'avancement progression parcoursup ' + p.label,
+                        build: () => buildPeriodBar(p),
+                        update: () => updatePeriodBar(p)
+                    });
+                });
+
+                examEvents.forEach(p => {
+                    annexOptions.push({
+                        id: 'progress-exam-' + p.id,
+                        category: 'Avancement — Examens',
+                        label: 'Examen : ' + p.label,
+                        searchText: 'avancement progression examens ' + p.label,
                         build: () => buildPeriodBar(p),
                         update: () => updatePeriodBar(p)
                     });
@@ -1107,7 +1161,11 @@
                 legendsEl.innerHTML = '';
                 wrapper.classList.add('cumul-wrapper');
 
-                const source = type === 'vacation' ? vacationEvents : parcoursupEvents;
+                let source;
+                if (type === 'vacation') source = vacationEvents;
+                else if (type === 'parcoursup') source = parcoursupEvents;
+                else if (type === 'exam') source = examEvents;
+                else source = [];
 
                 const segments = source.map(p => {
                     const days = daysBetween(p.start, p.end);
@@ -1146,7 +1204,7 @@
                     currentPos += widthPct;
                 });
 
-                // Rendre les segments
+                // Rendu des segments (bout à bout)
                 cumulItems.forEach(item => {
                     const seg = document.createElement('div');
                     seg.className = 'progress-period';
@@ -1251,10 +1309,10 @@
                     const legend = document.createElement('div');
                     legend.className = 'legend-item';
                     legend.dataset.evtId = item.id;
+                    legend.style.top = '0';
                     legend.style.left = '0';
                     legend.style.width = '100%';
                     legend.style.height = (targetTop + 5) + 'rem';
-                    legend.style.top = '0';
 
                     const connector = document.createElement('div');
                     connector.className = 'legend-connector';
@@ -1288,8 +1346,11 @@
                     el.addEventListener('mouseenter', () => applyHighlight(el.dataset.evtId, wrapper));
                     el.addEventListener('mouseleave', () => applyHighlight(null, wrapper));
                 });
-                legendsEl.querySelectorAll('.legend-item').forEach(el => {
-                    el.addEventListener('mouseenter', () => applyHighlight(el.dataset.evtId, wrapper));
+                legendsEl.querySelectorAll('.legend-badge').forEach(el => {
+                    const parent = el.closest('.legend-item');
+                    if (!parent) return;
+                    const evtId = parent.dataset.evtId;
+                    el.addEventListener('mouseenter', () => applyHighlight(evtId, wrapper));
                     el.addEventListener('mouseleave', () => applyHighlight(null, wrapper));
                 });
 
@@ -1298,7 +1359,13 @@
 
             function updateCumulBar(type) {
                 const wrapper = document.getElementById('annexWrapper');
-                const source = type === 'vacation' ? vacationEvents : parcoursupEvents;
+
+                let source;
+                if (type === 'vacation') source = vacationEvents;
+                else if (type === 'parcoursup') source = parcoursupEvents;
+                else if (type === 'exam') source = examEvents;
+                else source = [];
+
                 const refDate = getCurrentDate();
 
                 const totalDays = source.reduce((acc, p) => acc + daysBetween(p.start, p.end), 0);
@@ -1332,7 +1399,12 @@
                 overlay.style.left = (progress * 100) + '%';
                 overlay.style.width = ((1 - progress) * 100) + '%';
 
-                const label = type === 'vacation' ? 'jours de vacances' : 'jours Parcoursup';
+                let label;
+                if (type === 'vacation') label = 'jours de vacances';
+                else if (type === 'parcoursup') label = 'jours Parcoursup';
+                else if (type === 'exam') label = 'jours d\'examens';
+                else label = 'jours';
+
                 document.getElementById('annexSummary').textContent =
                     elapsedDays + ' ' + label + ' écoulés sur ' + totalDays + ' (' + Math.round(progress * 100) + '%)';
             }
@@ -1448,6 +1520,8 @@
                     if (v) evtDate = v.start;
                     const pc = parcoursupEvents.find(x => x.id === id);
                     if (pc) evtDate = pc.start;
+                    const ex = examEvents.find(x => x.id === id);
+                    if (ex) evtDate = ex.start;
                     const i = instantEvents.find(x => x.id === id);
                     if (i) evtDate = i.date;
                     if (evtDate) subtitle.textContent = getRelativeText(evtDate, refDate);
@@ -1487,14 +1561,7 @@
                         color: evt.color || '#643c00'
                     })).filter(evt => !isNaN(evt.date.getTime()));
 
-                    let vacSrc = config.vacationEvents;
-                    let parcSrc = config.parcoursupEvents;
-                    if (!vacSrc && !parcSrc && config.periodEvents) {
-                        vacSrc = config.periodEvents;
-                        parcSrc = [];
-                    }
-
-                    vacationEvents = (vacSrc || []).map(p => ({
+                    vacationEvents = (config.vacationEvents || []).map(p => ({
                         id: p.id,
                         label: p.label,
                         start: new Date(p.start),
@@ -1502,12 +1569,20 @@
                         color: p.color || '#008673'
                     })).filter(p => !isNaN(p.start.getTime()) && !isNaN(p.end.getTime()));
 
-                    parcoursupEvents = (parcSrc || []).map(p => ({
+                    parcoursupEvents = (config.parcoursupEvents || []).map(p => ({
                         id: p.id,
                         label: p.label,
                         start: new Date(p.start),
                         end: new Date(p.end),
-                        color: p.color || '#b9335f'
+                        color: p.color || '#2e7d32'
+                    })).filter(p => !isNaN(p.start.getTime()) && !isNaN(p.end.getTime()));
+
+                    examEvents = (config.examEvents || []).map(p => ({
+                        id: p.id,
+                        label: p.label,
+                        start: new Date(p.start),
+                        end: new Date(p.end),
+                        color: p.color || '#c62828'
                     })).filter(p => !isNaN(p.start.getTime()) && !isNaN(p.end.getTime()));
 
                     if (config.title) {
