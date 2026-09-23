@@ -97,6 +97,25 @@
             z-index: 3;
         }
 
+        /* Ligne de la barre de progression (pour les périodes superposées) */
+        .progress-bar-row {
+            position: relative;
+            width: 100%;
+            height: 3.2rem;
+            margin-bottom: 0;
+        }
+
+        .annex-block .progress-bar-row {
+            height: 3.2rem;
+        }
+
+        /* Écart vertical entre les lignes de superposition */
+        .progress-bar-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
         .progress-bar-fill {
             height: 100%;
             width: 0%;
@@ -108,12 +127,6 @@
             transition: width 0.5s ease-in-out;
             opacity: 0.9;
             border-radius: 0.4rem;
-        }
-
-        .annex-block .progress-bar-wrapper {
-            background-color: #ffffff;
-            border: 0.1rem solid #e2e2e2;
-            box-shadow: inset 0 0.1rem 0.2rem rgba(0, 0, 0, 0.05);
         }
 
         .annex-block .progress-bar-fill {
@@ -219,11 +232,11 @@
         .legend-connector {
             position: absolute;
             top: 0;
-            left: 50%;
-            transform: translateX(-50%);
+            /* Le left est défini inline en fonction de l'ancre */
             width: 0.2rem;
             z-index: 1;
             pointer-events: none;
+            transform: translateX(-50%);
         }
 
         .legend-badge {
@@ -400,6 +413,7 @@
             .progress-permille { font-size: 3.6rem; }
             .progress-permille span { font-size: 1.8rem; }
             .progress-bar-wrapper { height: 2.8rem; }
+            .progress-bar-row { height: 2.8rem; }
             .legend-badge { font-size: 1.2rem; padding: 0.5rem 0.8rem; }
             .legend-badge .legend-title { font-size: 1.2rem; }
             .legend-badge .legend-subtitle { font-size: 0.9rem; }
@@ -413,6 +427,7 @@
             .progress-permille { font-size: 2.6rem; }
             .progress-permille span { font-size: 1.3rem; }
             .progress-bar-wrapper { height: 2.2rem; }
+            .progress-bar-row { height: 2.2rem; }
             .legend-badge { font-size: 1rem; padding: 0.4rem 0.6rem; }
             .legend-badge .legend-title { font-size: 1rem; }
             .legend-badge .legend-subtitle { font-size: 0.8rem; }
@@ -442,8 +457,12 @@
         <div class="progress-section" id="mainSection" style="display: none;">
             <p class="progress-permille" id="progressPermille">0 <span>‱</span></p>
             <div class="progress-bar-zone" id="mainZone">
-                <div class="progress-bar-wrapper" id="mainWrapper">
-                    <div class="progress-bar-fill" id="mainFill"></div>
+                <div class="progress-bar-stack" id="mainStack">
+                    <div class="progress-bar-row">
+                        <div class="progress-bar-wrapper" id="mainWrapper">
+                            <div class="progress-bar-fill" id="mainFill"></div>
+                        </div>
+                    </div>
                 </div>
                 <div class="legends-container" id="mainLegends"></div>
             </div>
@@ -464,8 +483,12 @@
 
             <div class="progress-section" id="annexSection">
                 <div class="progress-bar-zone" id="annexZone">
-                    <div class="progress-bar-wrapper" id="annexWrapper">
-                        <div class="progress-bar-fill" id="annexFill"></div>
+                    <div class="progress-bar-stack" id="annexStack">
+                        <div class="progress-bar-row">
+                            <div class="progress-bar-wrapper" id="annexWrapper">
+                                <div class="progress-bar-fill" id="annexFill"></div>
+                            </div>
+                        </div>
                     </div>
                     <div class="legends-container" id="annexLegends"></div>
                 </div>
@@ -488,9 +511,10 @@
             let startDate = null;
             let endDate = null;
             let instantEvents = [];
-            let periodEvents = [];
+            let vacationEvents = [];   // "Vacances Scolaire"
+            let parcoursupEvents = []; // "Periode Parcoursup"
             let annexOptions = [];
-            let currentAnnexId = 'cumul';
+            let currentAnnexId = 'cumul-vac';
             let config = null;
 
             // --- UTILITAIRES ---
@@ -532,84 +556,288 @@
                     .replace(/[\u0300-\u036f]/g, '');
             }
 
-            // --- CONSTRUCTION D'UNE BARRE GÉNÉRIQUE ---
-            function buildBar(options) {
-                const { items, wrapperEl, legendsEl, totalStart, totalEnd, minRowHeight, showPeriodSegments, isCumul } = options;
-                const refDate = getCurrentDate();
+            // --- REGROUPEMENT DES PÉRIODES PAR SUPERPOSITION ---
+            // Étant donné une liste de périodes (start, end), on les regroupe en "piles"
+            // (stack) telles que dans une même pile, toutes les périodes se chevauchent
+            // au moins partiellement. On renvoie un tableau de piles, chaque pile étant
+            // triée par durée décroissante (plus longue en premier = plus profond).
+            function groupPeriodsByOverlap(periods) {
+                const sorted = [...periods].sort((a, b) => a.start - b.start);
+                const stacks = [];
 
-                wrapperEl.querySelectorAll('.progress-period, .event-marker, .floating-label').forEach(el => el.remove());
-                legendsEl.innerHTML = '';
+                sorted.forEach(p => {
+                    // Chercher une pile existante où la période chevauche au moins une autre
+                    let placed = false;
+                    for (const stack of stacks) {
+                        const overlaps = stack.some(other =>
+                            p.start < other.end && p.end > other.start
+                        );
+                        if (overlaps) {
+                            stack.push(p);
+                            placed = true;
+                            break;
+                        }
+                    }
+                    if (!placed) {
+                        stacks.push([p]);
+                    }
+                });
 
-                wrapperEl.classList.toggle('cumul-wrapper', !!isCumul);
+                // Trier chaque pile par durée décroissante (plus long en premier)
+                stacks.forEach(stack => {
+                    stack.sort((a, b) => (b.end - b.start) - (a.end - a.start));
+                });
 
-                if (items.length === 0) {
-                    legendsEl.style.minHeight = '0';
-                    return;
-                }
+                return stacks;
+            }
 
-                const wrapperRect = wrapperEl.getBoundingClientRect();
-                const containerWidth = legendsEl.getBoundingClientRect().width || wrapperRect.width;
+            // --- CONSTRUCTION DES BARRES SUPERPOSÉES ---
+            // Renvoie le nombre de lignes créées et remplit chaque wrapper.
+            // stack : tableau de périodes triées (longue en premier = index 0 = plus profond)
+            // stackContainer : élément DOM .progress-bar-stack dans lequel on ajoute les rows
+            // fillEls : tableau qui recevra les éléments fill dans l'ordre des lignes
+            function buildStackedRows(stack, stackContainer, fillEls) {
+                // Nettoyer le conteneur (garder seulement les rows existants ? non : reconstruire)
+                stackContainer.innerHTML = '';
+                fillEls.length = 0;
 
-                items.forEach(item => {
-                    const s = Math.max(0, getProgress(item.start, totalStart, totalEnd));
-                    const e = Math.min(1, getProgress(item.end, totalStart, totalEnd));
+                // Créer une row par niveau de profondeur
+                stack.forEach((period, depth) => {
+                    const row = document.createElement('div');
+                    row.className = 'progress-bar-row';
+
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'progress-bar-wrapper';
+                    wrapper.dataset.depth = depth;
+
+                    const fill = document.createElement('div');
+                    fill.className = 'progress-bar-fill';
+                    wrapper.appendChild(fill);
+
+                    row.appendChild(wrapper);
+                    stackContainer.appendChild(row);
+
+                    fillEls.push(fill);
+                });
+            }
+
+            // --- CONSTRUCTION DES SEGMENTS SUR LES BARRES SUPERPOSÉES ---
+            // stack : tableau de périodes triées (longue en premier)
+            // stackContainer : conteneur .progress-bar-stack
+            // totalStart, totalEnd : bornes de la barre
+            // items : liste complète d'items (pour associer ids, couleurs, etc.)
+            // showSegments : true pour afficher les segments
+            // isCumul : true pour le mode cumulé (positions explicites)
+            function renderStackedSegments(stack, stackContainer, totalStart, totalEnd, items, showSegments, isCumul) {
+                const rows = stackContainer.querySelectorAll('.progress-bar-row');
+                // rows[depth] correspond à stack[depth]
+
+                // Pour chaque période dans chaque pile, on place son segment
+                stack.forEach((period, depth) => {
+                    const row = rows[depth];
+                    if (!row) return;
+                    const wrapper = row.querySelector('.progress-bar-wrapper');
+
+                    // Nettoyer les segments existants
+                    wrapper.querySelectorAll('.progress-period, .event-marker, .floating-label').forEach(el => el.remove());
+
+                    if (!showSegments) return;
+
+                    const s = Math.max(0, getProgress(period.start, totalStart, totalEnd));
+                    const e = Math.min(1, getProgress(period.end, totalStart, totalEnd));
                     if (e <= 0 || s >= 1) return;
 
-                    const leftPct = item.explicitLeft !== undefined ? item.explicitLeft : s * 100;
-                    const widthPct = item.explicitWidth !== undefined ? item.explicitWidth : (e - s) * 100;
+                    const leftPct = period.explicitLeft !== undefined ? period.explicitLeft : s * 100;
+                    const widthPct = period.explicitWidth !== undefined ? period.explicitWidth : (e - s) * 100;
 
-                    if (showPeriodSegments !== false) {
-                        const seg = document.createElement('div');
-                        seg.className = 'progress-period';
-                        seg.dataset.evtId = item.id;
-                        seg.style.left = leftPct + '%';
-                        seg.style.width = widthPct + '%';
-                        seg.style.backgroundColor = item.color;
-                        wrapperEl.appendChild(seg);
-                    }
+                    const seg = document.createElement('div');
+                    seg.className = 'progress-period';
+                    seg.dataset.evtId = period.id;
+                    seg.style.left = leftPct + '%';
+                    seg.style.width = widthPct + '%';
+                    seg.style.backgroundColor = period.color;
+                    wrapper.appendChild(seg);
 
-                    if (item.isInstant) {
+                    // Étiquette volante sur ce segment
+                    const floatLabel = document.createElement('div');
+                    floatLabel.className = 'floating-label';
+                    floatLabel.dataset.evtId = period.id;
+                    floatLabel.style.left = (leftPct + widthPct / 2) + '%';
+                    floatLabel.style.backgroundColor = period.color;
+                    floatLabel.style.setProperty('--floating-arrow-color', period.color);
+                    floatLabel.textContent = period.label;
+                    wrapper.appendChild(floatLabel);
+                });
+            }
+
+            // --- CONSTRUCTION D'UNE BARRE GÉNÉRIQUE ---
+            // options.items : liste des items (périodes + instants éventuellement)
+            // options.periodItems : uniquement les périodes (pour la superposition)
+            // options.stackContainer : .progress-bar-stack
+            function buildBar(options) {
+                const {
+                    items,
+                    periodItems,
+                    wrapperEl,        // (obsolète mais conservé pour compatibilité)
+                    stackContainer,
+                    legendsEl,
+                    totalStart,
+                    totalEnd,
+                    minRowHeight,
+                    showPeriodSegments,
+                    isCumul
+                } = options;
+                const refDate = getCurrentDate();
+
+                // Nettoyer les légendes
+                legendsEl.innerHTML = '';
+
+                // Étape 1 : regrouper les périodes en piles par superposition
+                const stacks = groupPeriodsByOverlap(periodItems);
+
+                // Étape 2 : construire les rows superposées
+                const fillEls = [];
+                buildStackedRows(stacks.flat().length ? stacks[0] ? stacks : [] : stacks, stackContainer, fillEls);
+
+                // Étape 3 : rendre les segments sur chaque row
+                stacks.forEach((stack, stackIdx) => {
+                    // Chaque pile a sa propre row (1 row par niveau de profondeur)
+                    // En fait, on va plutôt créer les rows globalement en fonction
+                    // du nombre maximum de niveaux dans toutes les piles.
+                });
+
+                // Pour simplifier, on va plutôt reconstruire les rows en fonction
+                // du nombre max de profondeurs observées dans toutes les piles.
+                const maxDepth = stacks.reduce((max, s) => Math.max(max, s.length), 0);
+
+                // Vider et reconstruire les rows
+                stackContainer.innerHTML = '';
+                fillEls.length = 0;
+
+                for (let depth = 0; depth < maxDepth; depth++) {
+                    const row = document.createElement('div');
+                    row.className = 'progress-bar-row';
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'progress-bar-wrapper';
+                    wrapper.dataset.depth = depth;
+                    const fill = document.createElement('div');
+                    fill.className = 'progress-bar-fill';
+                    wrapper.appendChild(fill);
+                    row.appendChild(wrapper);
+                    stackContainer.appendChild(row);
+                    fillEls.push(fill);
+                }
+
+                // Maintenant, pour chaque pile, on place les périodes sur les rows
+                // en fonction de leur profondeur dans la pile (index 0 = plus long = plus profond)
+                stacks.forEach(stack => {
+                    stack.forEach((period, depthInStack) => {
+                        const row = stackContainer.querySelectorAll('.progress-bar-row')[depthInStack];
+                        if (!row) return;
+                        const wrapper = row.querySelector('.progress-bar-wrapper');
+
+                        if (showPeriodSegments !== false) {
+                            const s = Math.max(0, getProgress(period.start, totalStart, totalEnd));
+                            const e = Math.min(1, getProgress(period.end, totalStart, totalEnd));
+                            if (e <= 0 || s >= 1) return;
+
+                            const leftPct = period.explicitLeft !== undefined ? period.explicitLeft : s * 100;
+                            const widthPct = period.explicitWidth !== undefined ? period.explicitWidth : (e - s) * 100;
+
+                            const seg = document.createElement('div');
+                            seg.className = 'progress-period';
+                            seg.dataset.evtId = period.id;
+                            seg.style.left = leftPct + '%';
+                            seg.style.width = widthPct + '%';
+                            seg.style.backgroundColor = period.color;
+                            wrapper.appendChild(seg);
+
+                            const floatLabel = document.createElement('div');
+                            floatLabel.className = 'floating-label';
+                            floatLabel.dataset.evtId = period.id;
+                            floatLabel.style.left = (leftPct + widthPct / 2) + '%';
+                            floatLabel.style.backgroundColor = period.color;
+                            floatLabel.style.setProperty('--floating-arrow-color', period.color);
+                            floatLabel.textContent = period.label;
+                            wrapper.appendChild(floatLabel);
+                        }
+                    });
+                });
+
+                // Étape 4 : marqueurs instantanés (sur la row la plus basse / principale)
+                const mainRow = stackContainer.querySelector('.progress-bar-row:last-child .progress-bar-wrapper')
+                             || stackContainer.querySelector('.progress-bar-wrapper');
+                if (mainRow) {
+                    items.filter(it => it.isInstant).forEach(item => {
+                        const p = getProgress(item.start, totalStart, totalEnd);
+                        if (p < 0 || p > 1) return;
                         const marker = document.createElement('div');
                         marker.className = 'event-marker';
                         marker.dataset.evtId = item.id;
-                        marker.style.left = leftPct + '%';
+                        marker.style.left = (p * 100) + '%';
                         marker.style.backgroundColor = item.color;
-                        wrapperEl.appendChild(marker);
-                    }
+                        mainRow.appendChild(marker);
 
-                    const floatLabel = document.createElement('div');
-                    floatLabel.className = 'floating-label';
-                    floatLabel.dataset.evtId = item.id;
-                    floatLabel.style.left = (leftPct + widthPct / 2) + '%';
-                    floatLabel.style.backgroundColor = item.color;
-                    floatLabel.style.setProperty('--floating-arrow-color', item.color);
-                    floatLabel.textContent = item.label;
-                    wrapperEl.appendChild(floatLabel);
+                        const floatLabel = document.createElement('div');
+                        floatLabel.className = 'floating-label';
+                        floatLabel.dataset.evtId = item.id;
+                        floatLabel.style.left = (p * 100) + '%';
+                        floatLabel.style.backgroundColor = item.color;
+                        floatLabel.style.setProperty('--floating-arrow-color', item.color);
+                        floatLabel.textContent = item.label;
+                        mainRow.appendChild(floatLabel);
+                    });
+                }
+
+                // Étape 5 : légendes
+                // On associe chaque item (période ou instant) à sa position horizontale
+                // sur la barre (ancre) et à sa position visuelle de badge.
+                const legendItems = [];
+
+                // Pour les périodes : ancre = centre de la période sur la barre
+                periodItems.forEach(p => {
+                    const s = Math.max(0, getProgress(p.start, totalStart, totalEnd));
+                    const e = Math.min(1, getProgress(p.end, totalStart, totalEnd));
+                    if (e <= 0 || s >= 1) return;
+
+                    const leftPct = p.explicitLeft !== undefined ? p.explicitLeft : s * 100;
+                    const widthPct = p.explicitWidth !== undefined ? p.explicitWidth : (e - s) * 100;
+                    const anchorPct = leftPct + widthPct / 2;
+
+                    legendItems.push({
+                        ...p,
+                        anchorPct,
+                        position: anchorPct / 100,
+                        relativeText: p.relativeText || getRelativeText(p.start, refDate),
+                        isInstant: false
+                    });
                 });
 
-                const legendItems = items.map(item => {
-                    const s = Math.max(0, getProgress(item.start, totalStart, totalEnd));
-                    const e = Math.min(1, getProgress(item.end, totalStart, totalEnd));
-                    if (e <= 0 || s >= 1) return null;
-
-                    const leftPct = item.explicitLeft !== undefined ? item.explicitLeft : s * 100;
-                    const widthPct = item.explicitWidth !== undefined ? item.explicitWidth : (e - s) * 100;
-
-                    return {
+                // Pour les instants
+                items.filter(it => it.isInstant).forEach(item => {
+                    const p = getProgress(item.start, totalStart, totalEnd);
+                    if (p < 0 || p > 1) return;
+                    legendItems.push({
                         ...item,
-                        position: (leftPct + widthPct / 2) / 100,
-                        relativeText: item.relativeText || getRelativeText(item.displayDate || item.start, refDate)
-                    };
-                }).filter(Boolean);
+                        anchorPct: p * 100,
+                        position: p,
+                        relativeText: getRelativeText(item.start, refDate),
+                        isInstant: true
+                    });
+                });
 
+                // Trier par position croissante
                 legendItems.sort((a, b) => a.position - b.position);
 
+                // Mesure des largeurs
                 const probe = document.createElement('div');
                 probe.className = 'legend-badge';
                 probe.style.position = 'absolute';
                 probe.style.visibility = 'hidden';
                 probe.style.whiteSpace = 'nowrap';
                 legendsEl.appendChild(probe);
+
+                const containerWidth = legendsEl.getBoundingClientRect().width || 100;
 
                 const badgeWidths = legendItems.map(item => {
                     probe.innerHTML = '<div class="legend-title">' + item.label + '</div>' +
@@ -620,6 +848,10 @@
 
                 legendsEl.removeChild(probe);
 
+                // Placement des badges : on garde l'ancre fixe, on décale le badge
+                // horizontalement si nécessaire pour éviter les chevauchements.
+                // Le badge est positionné à "pos" (centre), et le connecteur part de
+                // "anchorPct" (ancre) vers "pos" (centre du badge).
                 const positioned = [];
                 const rowOccupancy = [];
 
@@ -627,7 +859,9 @@
                     const w = badgeWidths[idx];
                     const halfW = w / 2;
                     let row = 0;
-                    let pos = item.position * 100;
+                    // Le badge est centré sur "pos" ; on cherche une position qui ne
+                    // chevauche personne sur la ligne, en partant de l'ancre.
+                    let pos = item.anchorPct;
 
                     while (true) {
                         if (!rowOccupancy[row]) rowOccupancy[row] = [];
@@ -643,6 +877,7 @@
                         row++;
                     }
 
+                    // Ajustement horizontal pour ne pas sortir du conteneur
                     const minPos = halfW + 0.5;
                     const maxPos = 100 - halfW - 0.5;
                     pos = Math.max(minPos, Math.min(maxPos, pos));
@@ -651,16 +886,11 @@
                     positioned.push({ ...item, pos, row });
                 });
 
-                // --- ESPACEMENT VERTICAL AUGMENTÉ ---
-                // Chaque ligne de légende a une hauteur minimale plus grande
-                // et un écart vertical (gap) plus important entre les lignes
-                // pour garantir un espacement visuel confortable.
+                // Espacement vertical
                 const ROW_BASE_HEIGHT_REM = minRowHeight || 5.5;
-                const ROW_GAP_REM = 1.6;   // écart vertical augmenté (avant : 0.8rem)
-                const FIRST_ROW_OFFSET_REM = 1.2; // espace sous la barre (avant : 0.4rem)
+                const ROW_GAP_REM = 1.6;
+                const FIRST_ROW_OFFSET_REM = 1.2;
 
-                // Calcul de la hauteur réellement nécessaire pour chaque ligne
-                // en fonction du contenu (chaque pastille fait ~4.5rem de haut)
                 const rowHeights = [];
                 positioned.forEach(item => {
                     if (!rowHeights[item.row]) rowHeights[item.row] = 0;
@@ -674,12 +904,11 @@
                     cumulativeTop += (rowHeights[r] || ROW_BASE_HEIGHT_REM) + ROW_GAP_REM;
                 }
 
-                const totalLegendsHeight = cumulativeTop + 1.5; // marge en bas
+                const totalLegendsHeight = cumulativeTop + 1.5;
                 legendsEl.style.minHeight = totalLegendsHeight + 'rem';
 
                 positioned.forEach(item => {
                     const targetTop = rowTops[item.row];
-                    const connectorHeight = targetTop;
 
                     const legend = document.createElement('div');
                     legend.className = 'legend-item';
@@ -689,17 +918,32 @@
                     legend.style.width = '0';
                     legend.style.top = '0';
 
+                    // Connecteur : part de la barre (top=0) au niveau de l'ancre (anchorPct),
+                    // et descend jusqu'au badge. On utilise un wrapper pour positionner
+                    // le connecteur sur l'ancre et le badge sur "pos".
+                    // Le connecteur est un élément absolu dans .legend-item, dont le left
+                    // correspond à anchorPct (position sur la barre), pas au centre du badge.
                     const connector = document.createElement('div');
                     connector.className = 'legend-connector';
-                    connector.style.height = connectorHeight + 'rem';
+                    connector.style.height = targetTop + 'rem';
                     connector.style.backgroundColor = item.color;
                     connector.style.top = '0';
+                    // Le left du connecteur est relatif au legend-item (dont le left
+                    // est déjà "pos"). On veut que le connecteur soit sur "anchorPct".
+                    // Donc on le décale par rapport au centre du legend-item :
+                    // décalage = anchorPct - pos (en % de la largeur du conteneur)
+                    const offsetPct = item.anchorPct - item.pos;
+                    connector.style.left = '50%';
+                    connector.style.marginLeft = offsetPct + '%';
                     legend.appendChild(connector);
 
+                    // Badge centré sur "pos"
                     const badge = document.createElement('div');
                     badge.className = 'legend-badge';
                     badge.style.backgroundColor = item.color;
                     badge.style.top = targetTop + 'rem';
+                    badge.style.left = '50%';
+                    badge.style.transform = 'translateX(-50%)';
 
                     const title = document.createElement('div');
                     title.className = 'legend-title';
@@ -715,18 +959,19 @@
                     legendsEl.appendChild(legend);
                 });
 
-                wrapperEl.querySelectorAll('.progress-period, .event-marker').forEach(el => {
-                    el.addEventListener('mouseenter', () => applyHighlight(el.dataset.evtId, wrapperEl));
-                    el.addEventListener('mouseleave', () => applyHighlight(null, wrapperEl));
+                // Survol
+                stackContainer.querySelectorAll('.progress-period, .event-marker').forEach(el => {
+                    el.addEventListener('mouseenter', () => applyHighlight(el.dataset.evtId, stackContainer));
+                    el.addEventListener('mouseleave', () => applyHighlight(null, stackContainer));
                 });
                 legendsEl.querySelectorAll('.legend-item').forEach(el => {
-                    el.addEventListener('mouseenter', () => applyHighlight(el.dataset.evtId, wrapperEl));
-                    el.addEventListener('mouseleave', () => applyHighlight(null, wrapperEl));
+                    el.addEventListener('mouseenter', () => applyHighlight(el.dataset.evtId, stackContainer));
+                    el.addEventListener('mouseleave', () => applyHighlight(null, stackContainer));
                 });
             }
 
-            function applyHighlight(id, wrapperEl) {
-                const zone = wrapperEl.closest('.progress-bar-zone');
+            function applyHighlight(id, stackContainer) {
+                const zone = stackContainer.closest('.progress-bar-zone');
                 if (!zone) return;
 
                 if (!id) {
@@ -748,17 +993,38 @@
             // --- BARRE PRINCIPALE ---
             function buildMainBar() {
                 const mainItems = [];
+                const periodItems = [];
 
-                periodEvents.forEach(p => {
-                    mainItems.push({
+                // Toutes les périodes (vacances + parcoursup) sont des périodes
+                // et peuvent se superposer. On les met dans periodItems.
+                vacationEvents.forEach(p => {
+                    const item = {
                         id: p.id,
                         label: p.label,
                         start: p.start,
                         end: p.end,
                         color: p.color,
                         isInstant: false,
-                        displayDate: p.start
-                    });
+                        displayDate: p.start,
+                        category: 'vacation'
+                    };
+                    mainItems.push(item);
+                    periodItems.push(item);
+                });
+
+                parcoursupEvents.forEach(p => {
+                    const item = {
+                        id: p.id,
+                        label: p.label,
+                        start: p.start,
+                        end: p.end,
+                        color: p.color,
+                        isInstant: false,
+                        displayDate: p.start,
+                        category: 'parcoursup'
+                    };
+                    mainItems.push(item);
+                    periodItems.push(item);
                 });
 
                 instantEvents.forEach(evt => {
@@ -777,13 +1043,16 @@
 
                 buildBar({
                     items: mainItems,
-                    wrapperEl: document.getElementById('mainWrapper'),
+                    periodItems: periodItems,
+                    wrapperEl: null,
+                    stackContainer: document.getElementById('mainStack'),
                     legendsEl: document.getElementById('mainLegends'),
                     totalStart: startDate,
                     totalEnd: endDate,
                     minRowHeight: 5.5,
                     showPeriodSegments: true,
-                    isCumul: false
+                    isCumul: false,
+                    fillEls: []
                 });
             }
 
@@ -791,26 +1060,50 @@
             function buildAnnexOptions() {
                 annexOptions = [];
 
+                // Vue d'ensemble : 2 options de cumul
                 annexOptions.push({
-                    id: 'cumul',
+                    id: 'cumul-vac',
                     category: 'Vue d\'ensemble',
-                    label: 'Vacances cumulées de l\'année',
-                    searchText: 'vacances cumulees ensemble total annee',
-                    build: buildCumulBar,
-                    update: updateCumulBar
+                    label: 'Vacances scolaires cumulées',
+                    searchText: 'vacances scolaires cumulees ensemble total',
+                    build: () => buildCumulBar('vacation'),
+                    update: () => updateCumulBar('vacation')
                 });
 
-                periodEvents.forEach(p => {
+                annexOptions.push({
+                    id: 'cumul-parc',
+                    category: 'Vue d\'ensemble',
+                    label: 'Périodes Parcoursup cumulées',
+                    searchText: 'parcoursup cumulees ensemble total',
+                    build: () => buildCumulBar('parcoursup'),
+                    update: () => updateCumulBar('parcoursup')
+                });
+
+                // Avancement des vacances scolaires
+                vacationEvents.forEach(p => {
                     annexOptions.push({
-                        id: 'progress-' + p.id,
-                        category: 'Avancement',
-                        label: 'Avancement : ' + p.label,
-                        searchText: 'avancement progression ' + p.label,
+                        id: 'progress-vac-' + p.id,
+                        category: 'Avancement — Vacances scolaires',
+                        label: 'Vacances : ' + p.label,
+                        searchText: 'avancement progression vacances ' + p.label,
                         build: () => buildPeriodBar(p),
                         update: () => updatePeriodBar(p)
                     });
                 });
 
+                // Avancement des périodes Parcoursup
+                parcoursupEvents.forEach(p => {
+                    annexOptions.push({
+                        id: 'progress-parc-' + p.id,
+                        category: 'Avancement — Parcoursup',
+                        label: 'Parcoursup : ' + p.label,
+                        searchText: 'avancement progression parcoursup ' + p.label,
+                        build: () => buildPeriodBar(p),
+                        update: () => updatePeriodBar(p)
+                    });
+                });
+
+                // Temps restant avant les événements instantanés
                 instantEvents.forEach(evt => {
                     annexOptions.push({
                         id: 'remaining-' + evt.id,
@@ -824,6 +1117,8 @@
             }
 
             function buildPeriodBar(period) {
+                // Pour une barre annexe d'une seule période : pas de superposition
+                // On utilise le même buildBar avec periodItems = [period]
                 buildBar({
                     items: [{
                         id: period.id,
@@ -834,7 +1129,17 @@
                         isInstant: false,
                         displayDate: period.start
                     }],
-                    wrapperEl: document.getElementById('annexWrapper'),
+                    periodItems: [{
+                        id: period.id,
+                        label: period.label,
+                        start: period.start,
+                        end: period.end,
+                        color: period.color,
+                        isInstant: false,
+                        displayDate: period.start
+                    }],
+                    wrapperEl: null,
+                    stackContainer: document.getElementById('annexStack'),
                     legendsEl: document.getElementById('annexLegends'),
                     totalStart: period.start,
                     totalEnd: period.end,
@@ -842,12 +1147,13 @@
                     showPeriodSegments: false,
                     isCumul: false
                 });
-                const fill = document.getElementById('annexFill');
-                fill.style.background = period.color;
+                const fill = document.querySelector('#annexStack .progress-bar-fill');
+                if (fill) fill.style.background = period.color;
             }
 
             function updatePeriodBar(period) {
-                const fill = document.getElementById('annexFill');
+                const fill = document.querySelector('#annexStack .progress-bar-fill');
+                if (!fill) return;
                 const refDate = getCurrentDate();
                 const progress = getProgress(refDate, period.start, period.end);
                 fill.style.width = (progress * 100) + '%';
@@ -869,7 +1175,17 @@
                         isInstant: false,
                         displayDate: evt.date
                     }],
-                    wrapperEl: document.getElementById('annexWrapper'),
+                    periodItems: [{
+                        id: evt.id,
+                        label: evt.label,
+                        start: startDate,
+                        end: evt.date,
+                        color: evt.color,
+                        isInstant: false,
+                        displayDate: evt.date
+                    }],
+                    wrapperEl: null,
+                    stackContainer: document.getElementById('annexStack'),
                     legendsEl: document.getElementById('annexLegends'),
                     totalStart: startDate,
                     totalEnd: evt.date,
@@ -877,12 +1193,13 @@
                     showPeriodSegments: false,
                     isCumul: false
                 });
-                const fill = document.getElementById('annexFill');
-                fill.style.background = evt.color;
+                const fill = document.querySelector('#annexStack .progress-bar-fill');
+                if (fill) fill.style.background = evt.color;
             }
 
             function updateInstantBar(evt) {
-                const fill = document.getElementById('annexFill');
+                const fill = document.querySelector('#annexStack .progress-bar-fill');
+                if (!fill) return;
                 const refDate = getCurrentDate();
                 const progress = getProgress(refDate, startDate, evt.date);
                 fill.style.width = (progress * 100) + '%';
@@ -895,23 +1212,42 @@
             }
 
             // --- BARRE CUMULÉE ---
-            function buildCumulBar() {
-                const wrapper = document.getElementById('annexWrapper');
+            // type : 'vacation' ou 'parcoursup'
+            function buildCumulBar(type) {
+                const stackContainer = document.getElementById('annexStack');
                 const legendsEl = document.getElementById('annexLegends');
-                const fill = document.getElementById('annexFill');
 
-                wrapper.querySelectorAll('.progress-period, .event-marker, .floating-label').forEach(el => el.remove());
+                // Vider
+                stackContainer.innerHTML = '';
                 legendsEl.innerHTML = '';
 
-                const segments = periodEvents.map(p => {
+                const source = type === 'vacation' ? vacationEvents : parcoursupEvents;
+
+                const segments = source.map(p => {
                     const days = daysBetween(p.start, p.end);
                     return { ...p, days };
                 });
                 const totalDays = segments.reduce((acc, s) => acc + s.days, 0);
 
-                fill.style.background = 'transparent';
-                fill.style.width = '0%';
+                if (totalDays <= 0) {
+                    document.getElementById('annexSummary').textContent = 'Aucune période';
+                    return;
+                }
 
+                // Une seule row pour le cumul (les segments sont bout à bout)
+                const row = document.createElement('div');
+                row.className = 'progress-bar-row';
+                const wrapper = document.createElement('div');
+                wrapper.className = 'progress-bar-wrapper cumul-wrapper';
+                row.appendChild(wrapper);
+                stackContainer.appendChild(row);
+
+                const fill = document.createElement('div');
+                fill.className = 'progress-bar-fill';
+                fill.style.background = 'transparent';
+                wrapper.appendChild(fill);
+
+                // Construire les items cumulés
                 const cumulItems = [];
                 let currentPos = 0;
 
@@ -934,28 +1270,173 @@
                     currentPos += widthPct;
                 });
 
-                buildBar({
-                    items: cumulItems,
-                    wrapperEl: wrapper,
-                    legendsEl: legendsEl,
-                    totalStart: startDate,
-                    totalEnd: endDate,
-                    minRowHeight: 5,
-                    showPeriodSegments: true,
-                    isCumul: true
+                // Rendre les segments
+                cumulItems.forEach(item => {
+                    const seg = document.createElement('div');
+                    seg.className = 'progress-period';
+                    seg.dataset.evtId = item.id;
+                    seg.style.left = item.explicitLeft + '%';
+                    seg.style.width = item.explicitWidth + '%';
+                    seg.style.backgroundColor = item.color;
+                    wrapper.appendChild(seg);
+
+                    const floatLabel = document.createElement('div');
+                    floatLabel.className = 'floating-label';
+                    floatLabel.dataset.evtId = item.id;
+                    floatLabel.style.left = (item.explicitLeft + item.explicitWidth / 2) + '%';
+                    floatLabel.style.backgroundColor = item.color;
+                    floatLabel.style.setProperty('--floating-arrow-color', item.color);
+                    floatLabel.textContent = item.label;
+                    wrapper.appendChild(floatLabel);
                 });
 
-                updateCumulBar();
+                // Légendes
+                const legendItems = cumulItems.map(item => ({
+                    ...item,
+                    anchorPct: item.explicitLeft + item.explicitWidth / 2,
+                    position: (item.explicitLeft + item.explicitWidth / 2) / 100
+                }));
+
+                legendItems.sort((a, b) => a.position - b.position);
+
+                // Mesure largeurs
+                const probe = document.createElement('div');
+                probe.className = 'legend-badge';
+                probe.style.position = 'absolute';
+                probe.style.visibility = 'hidden';
+                probe.style.whiteSpace = 'nowrap';
+                legendsEl.appendChild(probe);
+
+                const containerWidth = legendsEl.getBoundingClientRect().width || 100;
+
+                const badgeWidths = legendItems.map(item => {
+                    probe.innerHTML = '<div class="legend-title">' + item.label + '</div>' +
+                                      '<div class="legend-subtitle">' + item.relativeText + '</div>';
+                    const w = probe.getBoundingClientRect().width;
+                    return (w / containerWidth) * 100;
+                });
+
+                legendsEl.removeChild(probe);
+
+                // Placement
+                const positioned = [];
+                const rowOccupancy = [];
+
+                legendItems.forEach((item, idx) => {
+                    const w = badgeWidths[idx];
+                    const halfW = w / 2;
+                    let rowIdx = 0;
+                    let pos = item.anchorPct;
+
+                    while (true) {
+                        if (!rowOccupancy[rowIdx]) rowOccupancy[rowIdx] = [];
+                        const occupied = rowOccupancy[rowIdx];
+                        let overlap = false;
+                        for (const interval of occupied) {
+                            if (pos + halfW > interval[0] && pos - halfW < interval[1]) {
+                                overlap = true;
+                                break;
+                            }
+                        }
+                        if (!overlap) break;
+                        rowIdx++;
+                    }
+
+                    const minPos = halfW + 0.5;
+                    const maxPos = 100 - halfW - 0.5;
+                    pos = Math.max(minPos, Math.min(maxPos, pos));
+
+                    rowOccupancy[rowIdx].push([pos - halfW, pos + halfW]);
+                    positioned.push({ ...item, pos, row: rowIdx });
+                });
+
+                // Espacement vertical
+                const ROW_BASE_HEIGHT_REM = 5;
+                const ROW_GAP_REM = 1.6;
+                const FIRST_ROW_OFFSET_REM = 1.2;
+
+                const rowHeights = [];
+                positioned.forEach(item => {
+                    if (!rowHeights[item.row]) rowHeights[item.row] = 0;
+                    rowHeights[item.row] = Math.max(rowHeights[item.row], 4.5);
+                });
+
+                const rowTops = [];
+                let cumulativeTop = FIRST_ROW_OFFSET_REM;
+                for (let r = 0; r < rowHeights.length; r++) {
+                    rowTops[r] = cumulativeTop;
+                    cumulativeTop += (rowHeights[r] || ROW_BASE_HEIGHT_REM) + ROW_GAP_REM;
+                }
+
+                legendsEl.style.minHeight = (cumulativeTop + 1.5) + 'rem';
+
+                positioned.forEach(item => {
+                    const targetTop = rowTops[item.row];
+                    const offsetPct = item.anchorPct - item.pos;
+
+                    const legend = document.createElement('div');
+                    legend.className = 'legend-item';
+                    legend.dataset.evtId = item.id;
+                    legend.style.left = item.pos + '%';
+                    legend.style.height = (targetTop + 5) + 'rem';
+                    legend.style.width = '0';
+                    legend.style.top = '0';
+
+                    const connector = document.createElement('div');
+                    connector.className = 'legend-connector';
+                    connector.style.height = targetTop + 'rem';
+                    connector.style.backgroundColor = item.color;
+                    connector.style.top = '0';
+                    connector.style.left = '50%';
+                    connector.style.marginLeft = offsetPct + '%';
+                    legend.appendChild(connector);
+
+                    const badge = document.createElement('div');
+                    badge.className = 'legend-badge';
+                    badge.style.backgroundColor = item.color;
+                    badge.style.top = targetTop + 'rem';
+                    badge.style.left = '50%';
+                    badge.style.transform = 'translateX(-50%)';
+
+                    const title = document.createElement('div');
+                    title.className = 'legend-title';
+                    title.textContent = item.label;
+                    badge.appendChild(title);
+
+                    const subtitle = document.createElement('div');
+                    subtitle.className = 'legend-subtitle';
+                    subtitle.textContent = item.relativeText;
+                    badge.appendChild(subtitle);
+
+                    legend.appendChild(badge);
+                    legendsEl.appendChild(legend);
+                });
+
+                // Survol
+                wrapper.querySelectorAll('.progress-period').forEach(el => {
+                    el.addEventListener('mouseenter', () => applyHighlight(el.dataset.evtId, stackContainer));
+                    el.addEventListener('mouseleave', () => applyHighlight(null, stackContainer));
+                });
+                legendsEl.querySelectorAll('.legend-item').forEach(el => {
+                    el.addEventListener('mouseenter', () => applyHighlight(el.dataset.evtId, stackContainer));
+                    el.addEventListener('mouseleave', () => applyHighlight(null, stackContainer));
+                });
+
+                updateCumulBar(type);
             }
 
-            function updateCumulBar() {
-                const refDate = getCurrentDate();
-                const wrapper = document.getElementById('annexWrapper');
+            function updateCumulBar(type) {
+                const stackContainer = document.getElementById('annexStack');
+                const wrapper = stackContainer.querySelector('.progress-bar-wrapper');
+                if (!wrapper) return;
 
-                const totalDays = periodEvents.reduce((acc, p) => acc + daysBetween(p.start, p.end), 0);
+                const source = type === 'vacation' ? vacationEvents : parcoursupEvents;
+                const refDate = getCurrentDate();
+
+                const totalDays = source.reduce((acc, p) => acc + daysBetween(p.start, p.end), 0);
 
                 let elapsedDays = 0;
-                periodEvents.forEach(p => {
+                source.forEach(p => {
                     const total = daysBetween(p.start, p.end);
                     if (refDate >= p.end) {
                         elapsedDays += total;
@@ -983,8 +1464,9 @@
                 overlay.style.left = (progress * 100) + '%';
                 overlay.style.width = ((1 - progress) * 100) + '%';
 
+                const label = type === 'vacation' ? 'jours de vacances' : 'jours Parcoursup';
                 document.getElementById('annexSummary').textContent =
-                    elapsedDays + ' jours de vacances écoulés sur ' + totalDays + ' (' + Math.round(progress * 100) + '%)';
+                    elapsedDays + ' ' + label + ' écoulés sur ' + totalDays + ' (' + Math.round(progress * 100) + '%)';
             }
 
             // --- SÉLECTEUR AVEC RECHERCHE ---
@@ -1063,13 +1545,9 @@
                 const opt = annexOptions.find(o => o.id === currentAnnexId);
                 if (!opt) return;
 
-                const fill = document.getElementById('annexFill');
-                fill.style.width = '0%';
-                fill.style.background = '';
-
-                const wrapper = document.getElementById('annexWrapper');
-                const oldOverlay = wrapper.querySelector('.cumul-progress-overlay');
-                if (oldOverlay) oldOverlay.remove();
+                // Nettoyer l'ancien overlay s'il existe
+                const stack = document.getElementById('annexStack');
+                stack.querySelectorAll('.cumul-progress-overlay').forEach(el => el.remove());
 
                 opt.build();
                 opt.update();
@@ -1079,7 +1557,14 @@
             function updateMain() {
                 const refDate = getCurrentDate();
                 const mainProgress = getProgress(refDate, startDate, endDate);
-                document.getElementById('mainFill').style.width = (mainProgress * 100) + '%';
+                // La barre principale : le fill est sur la row la plus basse
+                const stack = document.getElementById('mainStack');
+                const rows = stack.querySelectorAll('.progress-bar-row');
+                // On met le fill sur la première row (la plus profonde) par défaut
+                const mainFill = rows[0] ? rows[0].querySelector('.progress-bar-fill') : null;
+                if (mainFill) {
+                    mainFill.style.width = (mainProgress * 100) + '%';
+                }
                 const permille = Math.round(mainProgress * 10000);
                 document.getElementById('progressPermille').innerHTML = permille.toLocaleString('fr-FR') + ' <span>‱</span>';
             }
@@ -1098,8 +1583,10 @@
                     if (!subtitle) return;
                     const id = legend.dataset.evtId;
                     let evtDate = null;
-                    const p = periodEvents.find(x => x.id === id);
-                    if (p) evtDate = p.start;
+                    const v = vacationEvents.find(x => x.id === id);
+                    if (v) evtDate = v.start;
+                    const pc = parcoursupEvents.find(x => x.id === id);
+                    if (pc) evtDate = pc.start;
                     const i = instantEvents.find(x => x.id === id);
                     if (i) evtDate = i.date;
                     if (evtDate) subtitle.textContent = getRelativeText(evtDate, refDate);
@@ -1139,12 +1626,29 @@
                         color: evt.color || '#643c00'
                     })).filter(evt => !isNaN(evt.date.getTime()));
 
-                    periodEvents = (config.periodEvents || []).map(p => ({
+                    // Support de l'ancien format (periodEvents) pour compatibilité
+                    let vacSrc = config.vacationEvents;
+                    let parcSrc = config.parcoursupEvents;
+                    if (!vacSrc && !parcSrc && config.periodEvents) {
+                        // Ancien format : tout dans periodEvents -> considérés comme vacances
+                        vacSrc = config.periodEvents;
+                        parcSrc = [];
+                    }
+
+                    vacationEvents = (vacSrc || []).map(p => ({
                         id: p.id,
                         label: p.label,
                         start: new Date(p.start),
                         end: new Date(p.end),
                         color: p.color || '#008673'
+                    })).filter(p => !isNaN(p.start.getTime()) && !isNaN(p.end.getTime()));
+
+                    parcoursupEvents = (parcSrc || []).map(p => ({
+                        id: p.id,
+                        label: p.label,
+                        start: new Date(p.start),
+                        end: new Date(p.end),
+                        color: p.color || '#b9335f'
                     })).filter(p => !isNaN(p.start.getTime()) && !isNaN(p.end.getTime()));
 
                     if (config.title) {
